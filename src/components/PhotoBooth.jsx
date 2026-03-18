@@ -187,7 +187,7 @@ export default function PhotoBooth() {
       {/* HEADER */}
       <div style={{ width:"100%", padding:isMobile?"16px 12px":"24px 32px", textAlign:"center", borderBottom:`1px solid ${theme.accent}30` }}>
         <h1 style={{ fontSize:sz.titleFont, color:theme.textColor, fontWeight:"bold", textShadow:`0 0 30px ${theme.glow}`, margin:0, letterSpacing:2 }}>
-          ✦ Welcome to the Photo Booth ✦
+          ✦ Photo Booth ✦
         </h1>
       </div>
 
@@ -338,7 +338,9 @@ export default function PhotoBooth() {
           </div>
           <div style={{ fontSize:sz.tipFont, color:theme.mutedColor, lineHeight:1.6 }}>Tap to place · Drag to move · Double-tap removes</div>
         </div>
-
+<div style={{ width:"100%", padding:"10px", borderTop:`1px solid ${theme.accent}15`, textAlign:"center", fontSize:11, color:theme.mutedColor }}>
+  Icons & stickers by <a href="https://www.flaticon.com" target="_blank" rel="noreferrer" style={{ color:theme.accent }}>Flaticon</a> · Built with React & Canvas API
+</div>
       </div>
     </div>
   );
