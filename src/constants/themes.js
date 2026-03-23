@@ -15,20 +15,24 @@ export const THEMES = {
     mutedColor: "#1e6a8a", panelBackground: "rgba(2, 11, 24, 0.97)",
     glow: "#38bdf8", font: "'Playfair Display', Georgia, serif",
   },
-  anime: {
-    name: "Anime", emoji: "✨",
+  script: {
+    name: "Script", emoji: "✍️",
     background: "#1a0828",
     backgroundGradient: "radial-gradient(ellipse at 50% 0%, #3b0764 0%, #1a0828 65%)",
     accent: "#f472b6", accentDim: "#831843", textColor: "#fce7f3",
     mutedColor: "#9d174d", panelBackground: "rgba(26, 8, 40, 0.97)",
     glow: "#f472b6", font: "'Fredoka One', cursive",
   },
-  halloween: {
+ halloween: {
     name: "Halloween", emoji: "🎃",
-    background: "#0a0500",
-    backgroundGradient: "radial-gradient(ellipse at 50% 0%, #1c0900 0%, #0a0500 65%)",
-    accent: "#f97316", accentDim: "#7c2d12", textColor: "#fed7aa",
-    mutedColor: "#854d0e", panelBackground: "rgba(10, 5, 0, 0.97)",
+
+    // Change these two:
+    background: "#1a0a00",                    // was #0a0500 — slightly lighter
+    backgroundGradient: "radial-gradient(ellipse at 50% 0%, #2d1200 0%, #1a0a00 65%)",  // was #1c0900 / #0a0500
+
+    accent: "#f97316", accentDim: "#7c2d12",
+    textColor: "#fed7aa", mutedColor: "#854d0e",
+    panelBackground: "rgba(26, 14, 0, 0.97)",  // was rgba(10, 5, 0) — slightly lighter
     glow: "#f97316", font: "'Creepster', cursive",
   },
   sakura: {
@@ -63,14 +67,18 @@ export const THEMES = {
     mutedColor: "#92400e", panelBackground: "rgba(26, 10, 0, 0.97)",
     glow: "#fb923c", font: "'Cinzel', Georgia, serif",
   },
-  disco: {
-    name: "Disco", emoji: "🪩",
-    background: "#0d0010",
-    backgroundGradient: "radial-gradient(ellipse at 50% 0%, #1f0033 0%, #0d0010 65%)",
-    accent: "#f0abfc", accentDim: "#581c87", textColor: "#fdf4ff",
-    mutedColor: "#7e22ce", panelBackground: "rgba(13, 0, 16, 0.97)",
-    glow: "#f0abfc", font: "'Pacifico', cursive",
-  },
+kawaii: {
+  name: "Kawaii", emoji: "🎀",
+  background: "#f0f9ff",
+  backgroundGradient: "radial-gradient(circle at 30% 20%, #ffe4f1 0%, #e0f2fe 40%, #f0f9ff 80%)",
+  accent: "#22c55e",        // minty fresh green
+  accentDim: "#bbf7d0",
+  textColor: "#1e3a8a",     // soft deep blue
+  mutedColor: "#60a5fa",
+  panelBackground: "rgba(240, 249, 255, 0.96)",
+  glow: "#38bdf8",          // sky blue glow
+  font: "'Fredoka One', cursive",
+},
   music: {
     name: "Music", emoji: "🎵",
     background: "#080010",
@@ -79,4 +87,16 @@ export const THEMES = {
     mutedColor: "#9f1239", panelBackground: "rgba(8, 0, 16, 0.97)",
     glow: "#fb7185", font: "'Fredoka One', cursive",
   },
+  candypop: {
+  name: "Candy Pop", emoji: "🍬",
+  background: "#fff7ed",
+  backgroundGradient: "radial-gradient(circle at 30% 20%, #ffe4e6 0%, #fde68a 40%, #fff7ed 80%)",
+  accent: "#f97316",
+  accentDim: "#fed7aa",
+  textColor: "#7c2d12",
+  mutedColor: "#fb923c",
+  panelBackground: "rgba(255, 247, 237, 0.96)",
+  glow: "#f97316",
+  font: "'Fredoka One', cursive",
+},
 };

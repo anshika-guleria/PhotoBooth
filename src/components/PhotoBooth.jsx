@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CAMERA_FILTERS } from '../constants/filters';
-import { STICKERS_PER_THEME, STICKER_FALLBACK } from '../constants/stickers';
+import { STICKERS_PER_THEME } from '../constants/stickers';
 import { THEMES } from '../constants/themes';
 import useCamera from '../hooks/useCamera';
 import { applyFilterToPixels } from '../utils/filterUtils';
 import { drawArtBorder } from '../utils/glitter';
-import { getCachedImage } from '../utils/stickerCache';
+import { getCachedImage, preloadAllStickers } from '../utils/stickerCache';
 import BorderPreview from './BorderPreview';
 
 export default function PhotoBooth() {
 
-  const [selectedTheme,  setSelectedTheme]  = useState("forest");
+  const [selectedTheme,  setSelectedTheme]  = useState("sakura");
   const [selectedFilter, setSelectedFilter] = useState("none");
   const [selectedBorder, setSelectedBorder] = useState("none");
   const [placedStickers, setPlacedStickers] = useState([]);
@@ -20,15 +20,17 @@ export default function PhotoBooth() {
   const [showFlash,      setShowFlash]      = useState(false);
   const [draggingUid,    setDraggingUid]    = useState(null);
   const [dragOffset,     setDragOffset]     = useState({ x: 0, y: 0 });
+  const [selectedUid,    setSelectedUid]    = useState(null); // which sticker is selected
   const [isMobile,       setIsMobile]       = useState(false);
 
   const stickerLayer  = useRef(null);
   const countdownRef  = useRef(null);
 
   const { videoRef, canvasRef, cameraError } = useCamera(selectedFilter, selectedBorder);
-
   const theme = THEMES[selectedTheme];
-
+useEffect(() => {
+  preloadAllStickers();
+}, []);
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 760);
     check();
@@ -36,10 +38,18 @@ export default function PhotoBooth() {
     return () => window.removeEventListener("resize", check);
   }, []);
 
-  // Cleanup countdown on unmount
   useEffect(() => () => clearInterval(countdownRef.current), []);
 
-  // ── Capture photo ──────────────────────────────────────────────────────────
+  // Deselect sticker when clicking outside
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (!e.target.closest("[data-sticker]")) setSelectedUid(null);
+    };
+    window.addEventListener("mousedown", handleClick);
+    return () => window.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  // ── Capture photo — bakes rotation into canvas ─────────────────────────────
   const capturePhoto = useCallback(() => {
     const photoCanvas = document.createElement("canvas");
     photoCanvas.width = 480; photoCanvas.height = 360;
@@ -55,7 +65,12 @@ export default function PhotoBooth() {
     placedStickers.forEach(sticker => {
       const img = getCachedImage(sticker.key);
       if (img.complete && img.naturalWidth > 0) {
-        ctx.drawImage(img, sticker.x - sticker.size/2, sticker.y - sticker.size/2, sticker.size, sticker.size);
+        ctx.save();
+        ctx.translate(sticker.x, sticker.y);
+        ctx.rotate((sticker.rotation || 0) * Math.PI / 180);
+        ctx.scale(sticker.flipX ? -1 : 1, sticker.flipY ? -1 : 1);
+        ctx.drawImage(img, -sticker.size/2, -sticker.size/2, sticker.size, sticker.size);
+        ctx.restore();
       }
     });
     drawArtBorder(ctx, 480, 360, selectedBorder);
@@ -81,13 +96,12 @@ export default function PhotoBooth() {
     }, 1000);
   }, [countdown, activeSlot, capturePhoto]);
 
-  // ── Redo slot ──────────────────────────────────────────────────────────────
   const handleRedo = (i) => {
     setPhotoStrip(prev => { const u = [...prev]; u[i] = null; return u; });
     setActiveSlot(i);
   };
 
-  // ── Download strip ─────────────────────────────────────────────────────────
+  // ── Download ───────────────────────────────────────────────────────────────
   const handleDownload = async () => {
     const PW=480, PH=360, PAD=16, GAP=10, HH=60, FH=40;
     const sw = PW + PAD*2;
@@ -125,16 +139,29 @@ export default function PhotoBooth() {
     link.click();
   };
 
-  // ── Stickers ───────────────────────────────────────────────────────────────
+  // ── Sticker actions ────────────────────────────────────────────────────────
   const handleAddSticker = (key) => {
+    const uid = Date.now()+Math.random();
     setPlacedStickers(prev => [...prev, {
-      uid: Date.now()+Math.random(), key,
-      x: 80+Math.random()*310, y: 50+Math.random()*250, size: 60,
+      uid, key,
+      x: 120+Math.random()*240,
+      y: 80+Math.random()*200,
+      size: 64,
+      rotation: 0,
+      flipX: false,
+      flipY: false,
     }]);
+    setSelectedUid(uid);
+  };
+
+  const updateSticker = (uid, changes) => {
+    setPlacedStickers(prev => prev.map(s => s.uid === uid ? { ...s, ...changes } : s));
   };
 
   const handleStickerDragStart = (event, uid) => {
     event.preventDefault();
+    event.stopPropagation();
+    setSelectedUid(uid);
     const layerRect = stickerLayer.current.getBoundingClientRect();
     const sticker = placedStickers.find(s => s.uid === uid);
     const clientX = event.touches ? event.touches[0].clientX : event.clientX;
@@ -148,30 +175,31 @@ export default function PhotoBooth() {
     const layerRect = stickerLayer.current.getBoundingClientRect();
     const clientX = event.touches ? event.touches[0].clientX : event.clientX;
     const clientY = event.touches ? event.touches[0].clientY : event.clientY;
-    const newX = Math.max(0, Math.min(460, clientX-layerRect.left-dragOffset.x));
-    const newY = Math.max(0, Math.min(330, clientY-layerRect.top-dragOffset.y));
-    setPlacedStickers(prev => prev.map(s => s.uid===draggingUid ? {...s,x:newX,y:newY} : s));
+    const newX = Math.max(0, Math.min(480, clientX-layerRect.left-dragOffset.x));
+    const newY = Math.max(0, Math.min(360, clientY-layerRect.top-dragOffset.y));
+    updateSticker(draggingUid, { x: newX, y: newY });
   }, [draggingUid, dragOffset]);
 
   const handleDragEnd = () => setDraggingUid(null);
 
-  // ── Derived values ─────────────────────────────────────────────────────────
+  // ── Derived ────────────────────────────────────────────────────────────────
   const filledPhotoCount = photoStrip.filter(Boolean).length;
   const canSnap = activeSlot < 3 && countdown === null;
   const currentStickerKeys = STICKERS_PER_THEME[selectedTheme];
+  const selectedSticker = placedStickers.find(s => s.uid === selectedUid);
 
   const sz = isMobile ? {
     titleFont:22, themeFont:12, themePad:"6px 12px", labelFont:12, chipFont:13,
     chipPad:"6px 14px", snapFont:17, snapPad:"14px 28px", btnFont:13, btnPad:"11px 18px",
     stripW:"100%", slotFont:20, redoFont:11, dlFont:15, dlPad:"13px 0",
     panelPad:"14px", gap:12, mainPad:"14px 12px",
-    stickerCols:"repeat(auto-fill, minmax(56px, 1fr))", tipFont:12,
+    stickerCols:"repeat(auto-fill, minmax(48px, 1fr))", tipFont:11,
   } : {
     titleFont:34, themeFont:14, themePad:"8px 18px", labelFont:13, chipFont:14,
     chipPad:"8px 16px", snapFont:19, snapPad:"17px 40px", btnFont:15, btnPad:"14px 24px",
     stripW:230, slotFont:24, redoFont:13, dlFont:16, dlPad:"15px 0",
     panelPad:"20px", gap:18, mainPad:"20px 20px",
-    stickerCols:"repeat(auto-fill, minmax(72px, 1fr))", tipFont:13,
+    stickerCols:"repeat(auto-fill, minmax(58px, 1fr))", tipFont:12,
   };
 
   return (
@@ -184,6 +212,7 @@ export default function PhotoBooth() {
       onMouseMove={handleDragMove} onMouseUp={handleDragEnd}
       onTouchMove={handleDragMove} onTouchEnd={handleDragEnd}
     >
+
       {/* HEADER */}
       <div style={{ width:"100%", padding:isMobile?"16px 12px":"24px 32px", textAlign:"center", borderBottom:`1px solid ${theme.accent}30` }}>
         <h1 style={{ fontSize:sz.titleFont, color:theme.textColor, fontWeight:"bold", textShadow:`0 0 30px ${theme.glow}`, margin:0, letterSpacing:2 }}>
@@ -194,7 +223,7 @@ export default function PhotoBooth() {
       {/* THEME BAR */}
       <div style={{ display:"flex", gap:8, flexWrap:"wrap", justifyContent:"center", padding:isMobile?"10px":"14px 24px", borderBottom:`1px solid ${theme.accent}20`, width:"100%", boxSizing:"border-box" }}>
         {Object.entries(THEMES).map(([k,v]) => (
-          <button key={k} onClick={() => { setSelectedTheme(k); setPlacedStickers([]); }} style={{
+          <button key={k} onClick={() => { setSelectedTheme(k);  setSelectedUid(null); }} style={{
             padding:sz.themePad, borderRadius:999,
             border:`2px solid ${k===selectedTheme ? theme.accent : theme.accent+"30"}`,
             background:k===selectedTheme ? theme.accent+"25" : "transparent",
@@ -227,20 +256,41 @@ export default function PhotoBooth() {
             <div ref={stickerLayer} style={{ position:"absolute", inset:0 }}>
               {placedStickers.map(sticker => {
                 const img = getCachedImage(sticker.key);
+                const isSelected = sticker.uid === selectedUid;
+                const pct = (v, base) => `${(v/base)*100}%`;
                 return (
-                  <div key={sticker.uid} style={{ position:"absolute", left:`${(sticker.x/480)*100}%`, top:`${(sticker.y/360)*100}%`, width:`${(sticker.size/480)*100}%`, aspectRatio:"1", cursor:"grab", zIndex:5, transform:"translate(-50%,-50%)", filter:"drop-shadow(0 3px 8px rgba(0,0,0,0.6))" }}
-                    onMouseDown={e => handleStickerDragStart(e,sticker.uid)}
-                    onTouchStart={e => handleStickerDragStart(e,sticker.uid)}
-                    onDoubleClick={() => setPlacedStickers(prev => prev.filter(s => s.uid!==sticker.uid))}
+                  <div
+                    key={sticker.uid}
+                    data-sticker="true"
+                    style={{
+                      position:"absolute",
+                      left: pct(sticker.x, 480),
+                      top:  pct(sticker.y, 360),
+                      width: pct(sticker.size, 480),
+                      aspectRatio:"1",
+                      transform:`translate(-50%,-50%) rotate(${sticker.rotation||0}deg) scaleX(${sticker.flipX ? -1 : 1}) scaleY(${sticker.flipY ? -1 : 1})`,
+                      cursor:"grab",
+                      zIndex: isSelected ? 10 : 5,
+                      filter:"drop-shadow(0 3px 8px rgba(0,0,0,0.5))",
+                      outline: isSelected ? `2px dashed ${theme.accent}` : "none",
+                      outlineOffset: "3px",
+                      borderRadius: 4,
+                    }}
+                    onMouseDown={e => handleStickerDragStart(e, sticker.uid)}
+                    onTouchStart={e => handleStickerDragStart(e, sticker.uid)}
+                    onDoubleClick={() => {
+                      setPlacedStickers(prev => prev.filter(s => s.uid !== sticker.uid));
+                      setSelectedUid(null);
+                    }}
                     title="Drag · Double-click to remove"
                   >
-                    <img src={img.src} alt={sticker.key} style={{ width:"100%", height:"100%", pointerEvents:"none" }} />
+                    <img src={img.src} alt={sticker.key} style={{ width:"100%", height:"100%", pointerEvents:"none", display:"block" }} />
                   </div>
                 );
               })}
             </div>
 
-            {/* Flash overlay */}
+            {/* Flash */}
             <div style={{ position:"absolute", inset:0, background:"white", opacity:showFlash?1:0, transition:showFlash?"none":"opacity 0.35s", pointerEvents:"none", zIndex:8 }} />
 
             {/* Countdown */}
@@ -250,6 +300,95 @@ export default function PhotoBooth() {
               </div>
             )}
           </div>
+
+          {/* ── Sticker resize + rotate controls (shows when a sticker is selected) ── */}
+          {selectedSticker && (
+            <div data-sticker="true" style={{
+              display:"flex", flexDirection:"column", gap:8,
+              background: theme.panelBackground,
+              border:`1.5px solid ${theme.accent}50`,
+              borderRadius:12, padding:"12px 14px",
+            }}>
+              <div style={{ fontSize:11, fontWeight:"bold", color:theme.accent, textTransform:"uppercase", letterSpacing:"0.08em" }}>
+                Selected sticker
+              </div>
+
+              {/* Size slider */}
+              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                <span style={{ fontSize:12, color:theme.mutedColor, width:44 }}>Size</span>
+                <input type="range" min={24} max={200} value={selectedSticker.size}
+                  onChange={e => updateSticker(selectedUid, { size: Number(e.target.value) })}
+                  style={{ flex:1, accentColor: theme.accent }}
+                />
+                <span style={{ fontSize:12, color:theme.mutedColor, width:32, textAlign:"right" }}>{selectedSticker.size}px</span>
+              </div>
+
+              {/* Rotation slider */}
+              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                <span style={{ fontSize:12, color:theme.mutedColor, width:44 }}>Rotate</span>
+                <input type="range" min={-180} max={180} value={selectedSticker.rotation||0}
+                  onChange={e => updateSticker(selectedUid, { rotation: Number(e.target.value) })}
+                  style={{ flex:1, accentColor: theme.accent }}
+                />
+                <span style={{ fontSize:12, color:theme.mutedColor, width:32, textAlign:"right" }}>{selectedSticker.rotation||0}°</span>
+              </div>
+
+              {/* Quick rotate buttons + delete */}
+              <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+                {[
+                  { label:"↺ -15°", delta:-15 },
+                  { label:"↻ +15°", delta:+15 },
+                  { label:"↺ -45°", delta:-45 },
+                  { label:"↻ +45°", delta:+45 },
+                  { label:"Reset",  reset:true },
+                ].map(btn => (
+                  <button key={btn.label}
+                    onClick={() => {
+                      if (btn.reset) updateSticker(selectedUid, { rotation:0, size:64, flipX:false, flipY:false });
+                      else updateSticker(selectedUid, { rotation: ((selectedSticker.rotation||0) + btn.delta + 360) % 360 });
+                    }}
+                    style={{
+                      padding:"4px 10px", borderRadius:999, fontSize:11,
+                      border:`1.5px solid ${theme.accent}50`,
+                      background:"transparent", color:theme.accent,
+                      cursor:"pointer", fontFamily:"inherit",
+                    }}
+                  >{btn.label}</button>
+                ))}
+                <button
+                  onClick={() => { setPlacedStickers(prev => prev.filter(s => s.uid !== selectedUid)); setSelectedUid(null); }}
+                  style={{
+                    padding:"4px 10px", borderRadius:999, fontSize:11,
+                    border:"1.5px solid #ef4444",
+                    background:"transparent", color:"#ef4444",
+                    cursor:"pointer", fontFamily:"inherit", marginLeft:"auto",
+                  }}
+                >🗑 Remove</button>
+              </div>
+
+              {/* Flip buttons */}
+              <div style={{ display:"flex", gap:6 }}>
+                <button
+                  onClick={() => updateSticker(selectedUid, { flipX: !selectedSticker.flipX })}
+                  style={{
+                    padding:"4px 12px", borderRadius:999, fontSize:11,
+                    border:`1.5px solid ${selectedSticker.flipX ? theme.accent : theme.accent+"50"}`,
+                    background: selectedSticker.flipX ? theme.accent+"25" : "transparent",
+                    color: theme.accent, cursor:"pointer", fontFamily:"inherit",
+                  }}
+                >⇔ Flip Horizontal</button>
+                <button
+                  onClick={() => updateSticker(selectedUid, { flipY: !selectedSticker.flipY })}
+                  style={{
+                    padding:"4px 12px", borderRadius:999, fontSize:11,
+                    border:`1.5px solid ${selectedSticker.flipY ? theme.accent : theme.accent+"50"}`,
+                    background: selectedSticker.flipY ? theme.accent+"25" : "transparent",
+                    color: theme.accent, cursor:"pointer", fontFamily:"inherit",
+                  }}
+                >⇕ Flip Vertical</button>
+              </div>
+            </div>
+          )}
 
           {/* Filters */}
           <div>
@@ -282,7 +421,7 @@ export default function PhotoBooth() {
             }}>
               {countdown!==null ? `⏱ ${countdown}` : activeSlot>=3 ? "Strip Full!" : `📸 Snap  (${3-activeSlot} left)`}
             </button>
-            <button onClick={() => setPlacedStickers([])} style={{ padding:sz.btnPad, borderRadius:999, border:`2px solid ${theme.accent}`, background:"transparent", color:theme.accent, fontSize:sz.btnFont, cursor:"pointer", fontFamily:"inherit" }}>
+            <button onClick={() => { setPlacedStickers([]); setSelectedUid(null); }} style={{ padding:sz.btnPad, borderRadius:999, border:`2px solid ${theme.accent}`, background:"transparent", color:theme.accent, fontSize:sz.btnFont, cursor:"pointer", fontFamily:"inherit" }}>
               Clear Stickers
             </button>
             <button onClick={() => { setPhotoStrip([null,null,null]); setActiveSlot(0); }} style={{ padding:sz.btnPad, borderRadius:999, border:`2px solid ${theme.accent}`, background:"transparent", color:theme.accent, fontSize:sz.btnFont, cursor:"pointer", fontFamily:"inherit" }}>
@@ -320,28 +459,41 @@ export default function PhotoBooth() {
         {/* RIGHT: Stickers */}
         <div style={{ display:"flex", flexDirection:"column", gap:10, background:theme.panelBackground, borderRadius:18, border:`2px solid ${theme.accent}30`, padding:sz.panelPad, flex:"0 0 auto", width:isMobile?"100%":270, boxSizing:"border-box", overflow:"hidden", minWidth:0 }}>
           <div style={{ fontSize:sz.labelFont+2, fontWeight:"bold", color:theme.accent, letterSpacing:"0.1em", textTransform:"uppercase" }}>Stickers</div>
-          <div style={{ display:"grid", gridTemplateColumns:sz.stickerCols, gap:8, width:"100%", minWidth:0 }}>
+          <div style={{ display:"grid", gridTemplateColumns:sz.stickerCols, gap:6, width:"100%", minWidth:0 }}>
             {currentStickerKeys.map(key => {
               const img = getCachedImage(key);
               return (
-                <button key={key} onClick={() => handleAddSticker(key)} title={`Add ${key}`} style={{ minWidth:0, width:"100%", aspectRatio:"1", borderRadius:12, border:`2px solid ${theme.accent}30`, background:theme.accentDim+"28", cursor:"pointer", padding:7, display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", transition:"transform 0.12s, border-color 0.12s", boxSizing:"border-box", fontSize:28 }}
+                <button key={key} onClick={() => handleAddSticker(key)} title={`Add ${key}`}
+                  style={{ minWidth:0, width:"100%", aspectRatio:"1", borderRadius:10, border:`2px solid ${theme.accent}30`, background:theme.accentDim+"28", cursor:"pointer", padding:5, display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", transition:"transform 0.12s, border-color 0.12s", boxSizing:"border-box", fontSize:22 }}
                   onMouseEnter={e => { e.currentTarget.style.transform="scale(1.1)"; e.currentTarget.style.borderColor=theme.accent; }}
                   onMouseLeave={e => { e.currentTarget.style.transform="scale(1)";   e.currentTarget.style.borderColor=theme.accent+"30"; }}
                 >
-                  {img.complete&&img.naturalWidth>0&&!img.dataset.failed
-                    ? <img src={img.src} alt={key} style={{ width:"100%",height:"100%",objectFit:"contain",pointerEvents:"none",display:"block" }} />
-                    : STICKER_FALLBACK[key]||"?"
+                  {img.complete && img.naturalWidth > 0 && !img.dataset.failed
+                    ? <img src={img.src} alt={key} style={{ width:"70%", height:"70%", objectFit:"contain", pointerEvents:"none", display:"block", margin:"auto" }} />
+                    :"⏳"
                   }
                 </button>
               );
             })}
           </div>
-          <div style={{ fontSize:sz.tipFont, color:theme.mutedColor, lineHeight:1.6 }}>Tap to place · Drag to move · Double-tap removes</div>
+          <div style={{ fontSize:sz.tipFont, color:theme.mutedColor, lineHeight:1.6 }}>
+            Tap to place · Drag to move · Double-tap removes · Tap sticker to resize/rotate
+          </div>
         </div>
-<div style={{ width:"100%", padding:"10px", borderTop:`1px solid ${theme.accent}15`, textAlign:"center", fontSize:11, color:theme.mutedColor }}>
-  Icons & stickers by <a href="https://www.flaticon.com" target="_blank" rel="noreferrer" style={{ color:theme.accent }}>Flaticon</a> · Built with React & Canvas API
-</div>
+
       </div>
+
+      {/* CREDITS */}
+      <div style={{ width:"100%", padding:"14px 20px", borderTop:`1px solid ${theme.accent}15`, textAlign:"center", fontSize:12, color:theme.mutedColor, marginTop:"auto", boxSizing:"border-box" }}>
+        Stickers by{" "}
+        <a href="https://www.flaticon.com" target="_blank" rel="noreferrer" style={{ color:theme.accent, textDecoration:"none", fontWeight:"bold" }}>Flaticon</a>
+        {" · "}
+        Emoji by{" "}
+        <a href="https://openmoji.org" target="_blank" rel="noreferrer" style={{ color:theme.accent, textDecoration:"none", fontWeight:"bold" }}>OpenMoji</a>
+        {" · "}
+        Built with React &amp; Canvas API
+      </div>
+
     </div>
   );
 }

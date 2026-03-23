@@ -6,20 +6,22 @@ export const BORDER_T = 18;
 export const BORDER_CORNERS = {
   forest:    { tl:[60,210,185],  tr:[90,225,120],  bl:[30,190,155],  br:[60,210,185]  },
   ocean:     { tl:[80,210,255],  tr:[80,245,240],  bl:[40,215,225],  br:[130,160,255] },
-  anime:     { tl:[190,160,255], tr:[230,120,255], bl:[255,150,210], br:[255,100,180] },
+  script:     { tl:[190,160,255], tr:[230,120,255], bl:[255,150,210], br:[255,100,180] },
   halloween: { tl:[255,160,60],  tr:[255,100,20],  bl:[200,80,10],   br:[255,120,40]  },
   sakura:    { tl:[255,195,220], tr:[225,185,255], bl:[255,165,210], br:[255,195,220] },
   galaxy:    { tl:[140,155,255], tr:[200,130,255], bl:[120,170,255], br:[160,140,255] },
   pixel:     { tl:[80,255,100],  tr:[40,230,80],   bl:[20,200,60],   br:[60,240,90]   },
   autumn:    { tl:[255,160,60],  tr:[255,100,80],  bl:[220,100,20],  br:[255,140,50]  },
-  disco:     { tl:[255,160,210], tr:[140,200,255], bl:[80,230,185],  br:[255,210,100] },
+  kawaii:     { tl:[255,160,210], tr:[140,200,255], bl:[80,230,185],  br:[255,210,100] },
   music:     { tl:[255,140,160], tr:[210,150,255], bl:[255,100,130], br:[220,130,255] },
+  candypop:  { tl:[255,180,140], tr:[255,140,180], bl:[255,210,120], br:[255,170,130] },
 };
 
 export const GLOW_COLORS = {
-  forest:"#4ade80", ocean:"#38bdf8", anime:"#f472b6", halloween:"#f97316",
+  forest:"#4ade80", ocean:"#38bdf8", script:"#f472b6", halloween:"#f97316",
   sakura:"#f9a8d4", galaxy:"#a78bfa", pixel:"#00ff41", autumn:"#fb923c",
-  disco:"#f0abfc",  music:"#fb7185",
+  kawaii:"#f0abfc",  music:"#fb7185",
+  candypop:"#fb923c",
 };
 
 // 40 star positions: [perimeterFraction 0-1, depthFraction 0-1]
@@ -36,12 +38,13 @@ export const PHOTO_BORDERS = [
   { id: "none",      name: "None",      preview: "○" },
   { id: "forest",    name: "Forest",    preview: "🌿" },
   { id: "ocean",     name: "Ocean",     preview: "🌊" },
-  { id: "anime",     name: "Anime",     preview: "✨" },
+  { id: "script",     name: "Script",     preview: "🪩" },
   { id: "halloween", name: "Halloween", preview: "🎃" },
   { id: "sakura",    name: "Sakura",    preview: "🌸" },
   { id: "galaxy",    name: "Galaxy",    preview: "🪐" },
   { id: "pixel",     name: "Pixel",     preview: "👾" },
   { id: "autumn",    name: "Autumn",    preview: "🍂" },
-  { id: "disco",     name: "Disco",     preview: "🪩" },
+  { id: "kawaii",     name: "Kawaii",     preview: "💕" },
   { id: "music",     name: "Music",     preview: "🎵" },
+  { id: "candypop",  name: "Candy Pop", preview: "🍬" },
 ];

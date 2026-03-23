@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { PHOTO_BORDERS, BORDER_T } from '../constants/borders';
+import { BORDER_T, PHOTO_BORDERS } from '../constants/borders';
 import { drawArtBorder } from '../utils/glitter';
 
 export default function BorderPreview({ selectedBorder, onSelect, theme }) {
