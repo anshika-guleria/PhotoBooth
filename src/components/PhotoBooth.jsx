@@ -24,8 +24,6 @@ export default function PhotoBooth() {
   const [isMobile,       setIsMobile]       = useState(false);
   const [mobileTab,      setMobileTab]      = useState("camera"); // camera | stickers | strip
 
-  const [isLandscape, setIsLandscape] = useState(false);
-
   const stickerLayer = useRef(null);
   const countdownRef = useRef(null);
 
@@ -37,33 +35,11 @@ export default function PhotoBooth() {
 
   useEffect(() => { preloadAllStickers(); }, []);
 
-  // Mobile browsers (especially iOS) need an explicit .play() call
   useEffect(() => {
-    const tryPlay = () => {
-      if (videoRef.current && videoRef.current.paused) {
-        videoRef.current.play().catch(() => {});
-      }
-    };
-    // Try immediately and on first touch
-    tryPlay();
-    document.addEventListener("touchstart", tryPlay, { once: true });
-    return () => document.removeEventListener("touchstart", tryPlay);
-  }, [videoRef]);
-
-  useEffect(() => {
-    const check = () => {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
-      setIsMobile(w < 760);
-      setIsLandscape(w > h);
-    };
+    const check = () => setIsMobile(window.innerWidth < 760);
     check();
     window.addEventListener("resize", check);
-    window.addEventListener("orientationchange", () => setTimeout(check, 100));
-    return () => {
-      window.removeEventListener("resize", check);
-      window.removeEventListener("orientationchange", check);
-    };
+    return () => window.removeEventListener("resize", check);
   }, []);
 
   useEffect(() => () => clearInterval(countdownRef.current), []);
@@ -190,28 +166,17 @@ export default function PhotoBooth() {
     const sticker = placedStickers.find(s => s.uid === uid);
     const clientX = event.touches ? event.touches[0].clientX : event.clientX;
     const clientY = event.touches ? event.touches[0].clientY : event.clientY;
-    // Scale screen coords to canvas coords (480×360)
-    const scaleX = 480 / layerRect.width;
-    const scaleY = 360 / layerRect.height;
     setDraggingUid(uid);
-    setDragOffset({
-      x: (clientX - layerRect.left) * scaleX - sticker.x,
-      y: (clientY - layerRect.top)  * scaleY - sticker.y,
-    });
+    setDragOffset({ x: clientX-layerRect.left-sticker.x, y: clientY-layerRect.top-sticker.y });
   };
 
   const handleDragMove = useCallback((event) => {
     if (!draggingUid || !stickerLayer.current) return;
-    // Prevent page scroll while dragging sticker on mobile
-    if (event.cancelable) event.preventDefault();
     const layerRect = stickerLayer.current.getBoundingClientRect();
     const clientX = event.touches ? event.touches[0].clientX : event.clientX;
     const clientY = event.touches ? event.touches[0].clientY : event.clientY;
-    // Scale screen coords to canvas coords
-    const scaleX = 480 / layerRect.width;
-    const scaleY = 360 / layerRect.height;
-    const newX = Math.max(0, Math.min(480, (clientX - layerRect.left) * scaleX - dragOffset.x));
-    const newY = Math.max(0, Math.min(360, (clientY - layerRect.top)  * scaleY - dragOffset.y));
+    const newX = Math.max(0, Math.min(480, clientX-layerRect.left-dragOffset.x));
+    const newY = Math.max(0, Math.min(360, clientY-layerRect.top-dragOffset.y));
     updateSticker(draggingUid, { x: newX, y: newY });
   }, [draggingUid, dragOffset]);
 
@@ -223,16 +188,7 @@ export default function PhotoBooth() {
   const selectedSticker = placedStickers.find(s => s.uid === selectedUid);
 
   // ── Size tokens ────────────────────────────────────────────────────────────
-  const sz = isMobile && isLandscape ? {
-    // Mobile landscape — more compact, side by side where possible
-    titleFont:16, themeFont:11, themePad:"4px 10px",
-    labelFont:11, chipFont:12, chipPad:"5px 10px",
-    snapFont:14, snapPad:"10px 0", btnFont:12, btnPad:"9px 12px",
-    stripW:"100%", slotFont:16, redoFont:10, dlFont:13, dlPad:"10px 0",
-    panelPad:"10px", gap:8, mainPad:"8px 10px",
-    stickerCols:"repeat(auto-fill, minmax(52px, 1fr))", tipFont:10,
-  } : isMobile ? {
-    // Mobile portrait
+  const sz = isMobile ? {
     titleFont:20, themeFont:13, themePad:"6px 14px",
     labelFont:13, chipFont:14, chipPad:"8px 14px",
     snapFont:16, snapPad:"14px 0", btnFont:14, btnPad:"12px 16px",
@@ -240,7 +196,6 @@ export default function PhotoBooth() {
     panelPad:"14px", gap:12, mainPad:"10px 12px",
     stickerCols:"repeat(auto-fill, minmax(58px, 1fr))", tipFont:12,
   } : {
-    // Desktop
     titleFont:34, themeFont:14, themePad:"8px 18px",
     labelFont:13, chipFont:14, chipPad:"8px 16px",
     snapFont:19, snapPad:"17px 40px", btnFont:15, btnPad:"14px 24px",
@@ -327,7 +282,7 @@ export default function PhotoBooth() {
           <canvas ref={canvasRef} width={480} height={360} style={{ position:"absolute", top:0, left:0, width:"100%", height:"100%" }} />
         )}
 
-        {/* Sticker layer — desktop uses stickerLayerDesktop ref */}
+        {/* Sticker layer */}
         <div ref={stickerLayer} style={{ position:"absolute", inset:0 }}>
           {placedStickers.map(sticker => {
             const img = getCachedImage(sticker.key);
@@ -343,7 +298,7 @@ export default function PhotoBooth() {
                   transform:`translate(-50%,-50%) rotate(${sticker.rotation||0}deg) scaleX(${sticker.flipX?-1:1}) scaleY(${sticker.flipY?-1:1})`,
                   cursor:"grab", zIndex:isSelected?10:5,
                   filter:"drop-shadow(0 3px 8px rgba(0,0,0,0.5))",
-                  outline:"none",
+                  outline:isSelected?`2px dashed ${theme.accent}`:"none",
                   outlineOffset:"3px", borderRadius:4,
                 }}
                 onMouseDown={e => handleStickerDragStart(e, sticker.uid)}
@@ -501,142 +456,40 @@ export default function PhotoBooth() {
 
       {/* ── MOBILE LAYOUT ── */}
       {isMobile ? (
-        <div style={{ width:"100%", display:"flex", flexDirection:"column", flex:1, minHeight:0 }}>
+        <div style={{ width:"100%", display:"flex", flexDirection:"column", flex:1 }}>
 
-          {/* ── Camera always visible at top on mobile ── */}
-          <div style={{ padding:"10px 12px 0", flexShrink:0 }}>
-
-            {/* Camera viewport */}
-            <div style={{ position:"relative", width:"100%", aspectRatio:"4/3", borderRadius:14, overflow:"hidden", border:`3px solid ${theme.accent}`, boxShadow:`0 0 32px ${theme.glow}44`, background:"#000" }}>
-              <video ref={videoRef} autoPlay muted playsInline
-                style={{ position:"absolute", opacity:0, top:0, left:0, width:1, height:1 }}
-              />
-              {cameraError ? (
-                <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", color:theme.mutedColor, gap:10 }}>
-                  <span style={{ fontSize:44 }}>📷</span>
-                  <span style={{ fontSize:14, textAlign:"center", padding:"0 20px", fontFamily:displayFont }}>Camera unavailable — please allow permission</span>
-                </div>
-              ) : (
-                <canvas ref={canvasRef} width={480} height={360}
-                  style={{ position:"absolute", top:0, left:0, width:"100%", height:"100%" }} />
-              )}
-
-              {/* Sticker layer — always rendered so drag works on any tab */}
-              <div ref={stickerLayer} style={{ position:"absolute", inset:0 }}>
-                {placedStickers.map(sticker => {
-                  const img = getCachedImage(sticker.key);
-                  const isSelected = sticker.uid === selectedUid;
-                  return (
-                    <div key={sticker.uid} data-sticker="true"
-                      style={{
-                        position:"absolute",
-                        left:`${(sticker.x/480)*100}%`,
-                        top:`${(sticker.y/360)*100}%`,
-                        width:`${(sticker.size/480)*100}%`,
-                        aspectRatio:"1",
-                        transform:`translate(-50%,-50%) rotate(${sticker.rotation||0}deg) scaleX(${sticker.flipX?-1:1}) scaleY(${sticker.flipY?-1:1})`,
-                        cursor:"grab", zIndex:isSelected?10:5,
-                        filter:"drop-shadow(0 2px 6px rgba(0,0,0,0.5))",
-                        outline:"none",
-                        outlineOffset:"2px", borderRadius:4,
-                      }}
-                      onMouseDown={e => handleStickerDragStart(e, sticker.uid)}
-                      onTouchStart={e => handleStickerDragStart(e, sticker.uid)}
-                      onDoubleClick={() => { setPlacedStickers(prev => prev.filter(s => s.uid !== sticker.uid)); setSelectedUid(null); }}
-                    >
-                      <img src={img.src} alt={sticker.key} style={{ width:"100%", height:"100%", pointerEvents:"none", display:"block" }} />
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Flash */}
-              <div style={{ position:"absolute", inset:0, background:"white", opacity:showFlash?1:0, transition:showFlash?"none":"opacity 0.35s", pointerEvents:"none", zIndex:8 }} />
-
-              {/* Countdown */}
-              {countdown !== null && (
-                <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", zIndex:9 }}>
-                  <span style={{ fontSize:"min(24vw,110px)", fontWeight:"bold", color:theme.accent, textShadow:`0 0 50px ${theme.glow}`, lineHeight:1 }}>{countdown}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Snap + Clear buttons always visible below camera */}
-            <div style={{ display:"flex", gap:8, marginTop:10 }}>
-              <button onClick={handleSnap} disabled={!canSnap} style={{
-                flex:1, padding:"13px 0", borderRadius:999, border:"none",
-                background:canSnap ? theme.accent : theme.mutedColor,
-                color:"#000", fontWeight:"bold", fontSize:16,
-                cursor:canSnap?"pointer":"default", fontFamily:displayFont,
-                boxShadow:canSnap?`0 0 20px ${theme.glow}99`:"none",
-                opacity:canSnap?1:0.45,
-              }}>
-                {countdown!==null ? `⏱ ${countdown}` : activeSlot>=3 ? "Strip Full!" : `📸 Snap (${3-activeSlot} left)`}
-              </button>
-              <button onClick={() => { setPlacedStickers([]); setSelectedUid(null); }}
-                style={{ padding:"13px 16px", borderRadius:999, border:`2px solid ${theme.accent}`, background:"transparent", color:theme.accent, fontSize:14, cursor:"pointer", fontFamily:displayFont }}>
-                Clear
-              </button>
-              <button onClick={() => { setPhotoStrip([null,null,null]); setActiveSlot(0); }}
-                style={{ padding:"13px 16px", borderRadius:999, border:`2px solid ${theme.accent}`, background:"transparent", color:theme.accent, fontSize:14, cursor:"pointer", fontFamily:displayFont }}>
-                Reset
-              </button>
-            </div>
+          {/* Mobile tab content */}
+          <div style={{ padding:"12px 12px", flex:1 }}>
+            {mobileTab === "camera"   && <CameraPanel />}
+            {mobileTab === "stickers" && <StickerPanel />}
+            {mobileTab === "strip"    && <StripPanel />}
           </div>
 
-          {/* ── Scrollable bottom section — swaps between tabs ── */}
-          <div style={{ flex:1, overflowY:"auto", padding:"10px 12px" }}>
-            {/* Sticker controls if one is selected */}
-            {selectedSticker && <div style={{ marginBottom:10 }}><StickerControls /></div>}
-
-            {/* Tab content */}
-            <div style={{ display: mobileTab === "filters"  ? "block" : "none" }}>
-              <div style={{ marginBottom:12 }}>
-                <div style={{ fontSize:13, fontWeight:"bold", color:theme.accent, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:8, fontFamily:displayFont }}>Filters</div>
-                <div style={{ display:"flex", gap:7, flexWrap:"wrap" }}>
-                  {CAMERA_FILTERS.map(f => (
-                    <button key={f.id} onClick={() => setSelectedFilter(f.id)} style={{
-                      padding:"8px 14px", borderRadius:999,
-                      border:`2px solid ${f.id===selectedFilter ? theme.accent : theme.accent+"35"}`,
-                      background:f.id===selectedFilter ? theme.accent+"25" : "transparent",
-                      color:f.id===selectedFilter ? theme.accent : theme.mutedColor,
-                      fontSize:14, cursor:"pointer", fontFamily:displayFont,
-                    }}>{f.name}</button>
-                  ))}
-                </div>
-              </div>
-              <BorderPreview selectedBorder={selectedBorder} onSelect={setSelectedBorder} theme={theme} />
-            </div>
-
-            <div style={{ display: mobileTab === "stickers" ? "block" : "none" }}><StickerPanel /></div>
-            <div style={{ display: mobileTab === "strip"    ? "block" : "none" }}><StripPanel /></div>
-          </div>
-
-          {/* ── Bottom tab bar ── */}
+          {/* Mobile bottom tab bar */}
           <div style={{
-            display:"flex", flexShrink:0,
-            borderTop:`1px solid ${theme.accent}30`,
+            position:"sticky", bottom:0,
+            display:"flex", borderTop:`1px solid ${theme.accent}30`,
             background:theme.panelBackground,
-            position:"sticky", bottom:0, zIndex:20,
+            zIndex:20,
           }}>
             {[
-              { id:"filters",  icon:"🎨", label:"Filters" },
-              { id:"stickers", icon:"✨", label:"Stickers" },
+              { id:"camera",   icon:"📷", label:"Camera" },
+              { id:"stickers", icon:"🎨", label:"Stickers" },
               { id:"strip",    icon:"🖼️", label:`Strip ${filledPhotoCount}/3` },
             ].map(tab => (
               <button key={tab.id} onClick={() => setMobileTab(tab.id)}
                 style={{
-                  flex:1, padding:"10px 4px 8px",
+                  flex:1, padding:"12px 4px 10px",
                   background: mobileTab===tab.id ? theme.accent+"18" : "transparent",
-                  border:"none",
-                  borderTop:`3px solid ${mobileTab===tab.id ? theme.accent : "transparent"}`,
+                  border:"none", borderTop:`3px solid ${mobileTab===tab.id ? theme.accent : "transparent"}`,
                   color: mobileTab===tab.id ? theme.accent : theme.mutedColor,
                   cursor:"pointer", fontFamily:displayFont,
-                  display:"flex", flexDirection:"column", alignItems:"center", gap:2,
+                  display:"flex", flexDirection:"column", alignItems:"center", gap:3,
+                  transition:"all 0.15s",
                 }}
               >
-                <span style={{ fontSize:20 }}>{tab.icon}</span>
-                <span style={{ fontSize:11, fontWeight:mobileTab===tab.id?"bold":"normal" }}>{tab.label}</span>
+                <span style={{ fontSize:22 }}>{tab.icon}</span>
+                <span style={{ fontSize:12, fontWeight: mobileTab===tab.id?"bold":"normal" }}>{tab.label}</span>
               </button>
             ))}
           </div>
