@@ -57,6 +57,7 @@ export const STICKER_URLS = {
   script_s13:  "https://cdn-icons-png.flaticon.com/512/8763/8763197.png",
   script_s14:  "https://cdn-icons-png.flaticon.com/512/8763/8763254.png",
   script_s15:  "https://cdn-icons-png.flaticon.com/512/8763/8763259.png",
+  script_s16:  "https://www.flaticon.com/free-sticker/thursday_8763248.png",
   script_s17:  "https://cdn-icons-png.flaticon.com/512/8763/8763125.png",
   script_s18:  "https://cdn-icons-png.flaticon.com/512/8763/8763217.png",
   script_s19:  "https://cdn-icons-png.flaticon.com/512/8763/8763243.png",
@@ -212,7 +213,7 @@ export const STICKER_URLS = {
 export const STICKERS_PER_THEME = {
   forest:    ["forest_s1","forest_s2","forest_s3","forest_s4","forest_s5","forest_s6","forest_s7","forest_s8","forest_s9","forest_s10","forest_s11","forest_s12","forest_s13","forest_s14","forest_s15","forest_s16"],
   ocean:     ["ocean_s1","ocean_s2","ocean_s3","ocean_s4","ocean_s5","ocean_s6","ocean_s7","ocean_s8","ocean_s9","ocean_s10","ocean_s11","ocean_s12","ocean_s13","ocean_s14","ocean_s15","ocean_s16","ocean_s17","ocean_s18"],
-  script:     ["script_s1","script_s2","script_s3","script_s4","script_s5","script_s6","script_s7","script_s8","script_s9","script_s10","script_s11","script_s12","script_s13","script_s14","script_s15","script_s17",
+  script:     ["script_s1","script_s2","script_s3","script_s4","script_s5","script_s6","script_s7","script_s8","script_s9","script_s10","script_s11","script_s12","script_s13","script_s14","script_s15","script_s16","script_s17",
     "script_s18","script_s19","script_s20","script_s21","script_s22","script_s23","script_s24","script_s25","script_s26"],
   halloween: ["halloween_s1","halloween_s2","halloween_s3","halloween_s4","halloween_s5","halloween_s6","halloween_s7","halloween_s8","halloween_s9","halloween_s10","halloween_s11","halloween_s12",
     "halloween_s13","halloween_s14","halloween_s15","halloween_s16","halloween_s17","halloween_s18","halloween_s19","halloween_s20","halloween_s21","halloween_s22","halloween_s23","halloween_s24","halloween_s25"],
