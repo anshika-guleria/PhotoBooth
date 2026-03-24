@@ -20,17 +20,21 @@ export default function PhotoBooth() {
   const [showFlash,      setShowFlash]      = useState(false);
   const [draggingUid,    setDraggingUid]    = useState(null);
   const [dragOffset,     setDragOffset]     = useState({ x: 0, y: 0 });
-  const [selectedUid,    setSelectedUid]    = useState(null); // which sticker is selected
+  const [selectedUid,    setSelectedUid]    = useState(null);
   const [isMobile,       setIsMobile]       = useState(false);
+  const [mobileTab,      setMobileTab]      = useState("camera"); // camera | stickers | strip
 
-  const stickerLayer  = useRef(null);
-  const countdownRef  = useRef(null);
+  const stickerLayer = useRef(null);
+  const countdownRef = useRef(null);
 
   const { videoRef, canvasRef, cameraError } = useCamera(selectedFilter, selectedBorder);
   const theme = THEMES[selectedTheme];
-useEffect(() => {
-  preloadAllStickers();
-}, []);
+
+  // Mobile font is always a clean readable sans-serif regardless of theme
+  const displayFont = isMobile ? "'Nunito', 'Segoe UI', sans-serif" : theme.font;
+
+  useEffect(() => { preloadAllStickers(); }, []);
+
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 760);
     check();
@@ -40,7 +44,6 @@ useEffect(() => {
 
   useEffect(() => () => clearInterval(countdownRef.current), []);
 
-  // Deselect sticker when clicking outside
   useEffect(() => {
     const handleClick = (e) => {
       if (!e.target.closest("[data-sticker]")) setSelectedUid(null);
@@ -49,7 +52,7 @@ useEffect(() => {
     return () => window.removeEventListener("mousedown", handleClick);
   }, []);
 
-  // ── Capture photo — bakes rotation into canvas ─────────────────────────────
+  // ── Capture photo ──────────────────────────────────────────────────────────
   const capturePhoto = useCallback(() => {
     const photoCanvas = document.createElement("canvas");
     photoCanvas.width = 480; photoCanvas.height = 360;
@@ -146,17 +149,14 @@ useEffect(() => {
       uid, key,
       x: 120+Math.random()*240,
       y: 80+Math.random()*200,
-      size: 64,
-      rotation: 0,
-      flipX: false,
-      flipY: false,
+      size: 64, rotation: 0, flipX: false, flipY: false,
     }]);
     setSelectedUid(uid);
+    if (isMobile) setMobileTab("camera");
   };
 
-  const updateSticker = (uid, changes) => {
+  const updateSticker = (uid, changes) =>
     setPlacedStickers(prev => prev.map(s => s.uid === uid ? { ...s, ...changes } : s));
-  };
 
   const handleStickerDragStart = (event, uid) => {
     event.preventDefault();
@@ -182,31 +182,251 @@ useEffect(() => {
 
   const handleDragEnd = () => setDraggingUid(null);
 
-  // ── Derived ────────────────────────────────────────────────────────────────
   const filledPhotoCount = photoStrip.filter(Boolean).length;
   const canSnap = activeSlot < 3 && countdown === null;
   const currentStickerKeys = STICKERS_PER_THEME[selectedTheme];
   const selectedSticker = placedStickers.find(s => s.uid === selectedUid);
 
+  // ── Size tokens ────────────────────────────────────────────────────────────
   const sz = isMobile ? {
-    titleFont:22, themeFont:12, themePad:"6px 12px", labelFont:12, chipFont:13,
-    chipPad:"6px 14px", snapFont:17, snapPad:"14px 28px", btnFont:13, btnPad:"11px 18px",
-    stripW:"100%", slotFont:20, redoFont:11, dlFont:15, dlPad:"13px 0",
-    panelPad:"14px", gap:12, mainPad:"14px 12px",
-    stickerCols:"repeat(auto-fill, minmax(48px, 1fr))", tipFont:11,
+    titleFont:20, themeFont:13, themePad:"6px 14px",
+    labelFont:13, chipFont:14, chipPad:"8px 14px",
+    snapFont:16, snapPad:"14px 0", btnFont:14, btnPad:"12px 16px",
+    stripW:"100%", slotFont:20, redoFont:12, dlFont:15, dlPad:"13px 0",
+    panelPad:"14px", gap:12, mainPad:"10px 12px",
+    stickerCols:"repeat(auto-fill, minmax(58px, 1fr))", tipFont:12,
   } : {
-    titleFont:34, themeFont:14, themePad:"8px 18px", labelFont:13, chipFont:14,
-    chipPad:"8px 16px", snapFont:19, snapPad:"17px 40px", btnFont:15, btnPad:"14px 24px",
+    titleFont:34, themeFont:14, themePad:"8px 18px",
+    labelFont:13, chipFont:14, chipPad:"8px 16px",
+    snapFont:19, snapPad:"17px 40px", btnFont:15, btnPad:"14px 24px",
     stripW:230, slotFont:24, redoFont:13, dlFont:16, dlPad:"15px 0",
     panelPad:"20px", gap:18, mainPad:"20px 20px",
     stickerCols:"repeat(auto-fill, minmax(58px, 1fr))", tipFont:12,
   };
 
+  // ── Sticker controls panel (shared between mobile/desktop) ─────────────────
+  const StickerControls = () => selectedSticker ? (
+    <div data-sticker="true" style={{
+      display:"flex", flexDirection:"column", gap:10,
+      background: theme.panelBackground,
+      border:`1.5px solid ${theme.accent}50`,
+      borderRadius:14, padding:"14px 16px",
+      fontFamily: displayFont,
+    }}>
+      <div style={{ fontSize:13, fontWeight:"bold", color:theme.accent, textTransform:"uppercase", letterSpacing:"0.06em" }}>
+        ✦ Sticker Controls
+      </div>
+
+      {/* Size */}
+      <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+        <span style={{ fontSize:13, color:theme.mutedColor, minWidth:50 }}>Size</span>
+        <input type="range" min={24} max={200} value={selectedSticker.size}
+          onChange={e => updateSticker(selectedUid, { size: Number(e.target.value) })}
+          style={{ flex:1, accentColor: theme.accent, height:6 }}
+        />
+        <span style={{ fontSize:13, color:theme.mutedColor, minWidth:36, textAlign:"right" }}>{selectedSticker.size}px</span>
+      </div>
+
+      {/* Rotate */}
+      <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+        <span style={{ fontSize:13, color:theme.mutedColor, minWidth:50 }}>Rotate</span>
+        <input type="range" min={-180} max={180} value={selectedSticker.rotation||0}
+          onChange={e => updateSticker(selectedUid, { rotation: Number(e.target.value) })}
+          style={{ flex:1, accentColor: theme.accent, height:6 }}
+        />
+        <span style={{ fontSize:13, color:theme.mutedColor, minWidth:36, textAlign:"right" }}>{selectedSticker.rotation||0}°</span>
+      </div>
+
+      {/* Quick buttons row */}
+      <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+        {[[-15,"↺ 15°"],[+15,"↻ 15°"],[-45,"↺ 45°"],[+45,"↻ 45°"]].map(([delta, label]) => (
+          <button key={label}
+            onClick={() => updateSticker(selectedUid, { rotation: ((selectedSticker.rotation||0) + delta + 360) % 360 })}
+            style={{ padding:"6px 12px", borderRadius:999, fontSize:13, border:`1.5px solid ${theme.accent}50`, background:"transparent", color:theme.accent, cursor:"pointer", fontFamily:displayFont }}
+          >{label}</button>
+        ))}
+        <button
+          onClick={() => updateSticker(selectedUid, { rotation:0, size:64, flipX:false, flipY:false })}
+          style={{ padding:"6px 12px", borderRadius:999, fontSize:13, border:`1.5px solid ${theme.accent}50`, background:"transparent", color:theme.accent, cursor:"pointer", fontFamily:displayFont }}
+        >Reset</button>
+      </div>
+
+      {/* Flip + Remove row */}
+      <div style={{ display:"flex", gap:6, flexWrap:"wrap", alignItems:"center" }}>
+        <button onClick={() => updateSticker(selectedUid, { flipX: !selectedSticker.flipX })}
+          style={{ padding:"6px 14px", borderRadius:999, fontSize:13, border:`1.5px solid ${selectedSticker.flipX ? theme.accent : theme.accent+"50"}`, background: selectedSticker.flipX ? theme.accent+"25" : "transparent", color:theme.accent, cursor:"pointer", fontFamily:displayFont }}
+        >⇔ Flip H</button>
+        <button onClick={() => updateSticker(selectedUid, { flipY: !selectedSticker.flipY })}
+          style={{ padding:"6px 14px", borderRadius:999, fontSize:13, border:`1.5px solid ${selectedSticker.flipY ? theme.accent : theme.accent+"50"}`, background: selectedSticker.flipY ? theme.accent+"25" : "transparent", color:theme.accent, cursor:"pointer", fontFamily:displayFont }}
+        >⇕ Flip V</button>
+        <button onClick={() => { setPlacedStickers(prev => prev.filter(s => s.uid !== selectedUid)); setSelectedUid(null); }}
+          style={{ padding:"6px 14px", borderRadius:999, fontSize:13, border:"1.5px solid #ef4444", background:"transparent", color:"#ef4444", cursor:"pointer", fontFamily:displayFont, marginLeft:"auto" }}
+        >🗑 Remove</button>
+      </div>
+    </div>
+  ) : null;
+
+  // ── Camera panel ───────────────────────────────────────────────────────────
+  const CameraPanel = () => (
+    <div style={{ display:"flex", flexDirection:"column", gap:sz.gap }}>
+
+      {/* Camera viewport */}
+      <div style={{ position:"relative", width:"100%", aspectRatio:"4/3", borderRadius:16, overflow:"hidden", border:`3px solid ${theme.accent}`, boxShadow:`0 0 44px ${theme.glow}55, 0 8px 32px rgba(0,0,0,0.4)`, background:"#000" }}>
+        <video ref={videoRef} autoPlay muted playsInline style={{ position:"absolute", opacity:0, top:0, left:0, width:1, height:1 }} />
+        {cameraError ? (
+          <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", color:theme.mutedColor, gap:14 }}>
+            <span style={{ fontSize:52 }}>📷</span>
+            <span style={{ fontSize:16, textAlign:"center", padding:"0 24px", fontFamily:displayFont }}>Camera unavailable — please allow permission</span>
+          </div>
+        ) : (
+          <canvas ref={canvasRef} width={480} height={360} style={{ position:"absolute", top:0, left:0, width:"100%", height:"100%" }} />
+        )}
+
+        {/* Sticker layer */}
+        <div ref={stickerLayer} style={{ position:"absolute", inset:0 }}>
+          {placedStickers.map(sticker => {
+            const img = getCachedImage(sticker.key);
+            const isSelected = sticker.uid === selectedUid;
+            return (
+              <div key={sticker.uid} data-sticker="true"
+                style={{
+                  position:"absolute",
+                  left:`${(sticker.x/480)*100}%`,
+                  top:`${(sticker.y/360)*100}%`,
+                  width:`${(sticker.size/480)*100}%`,
+                  aspectRatio:"1",
+                  transform:`translate(-50%,-50%) rotate(${sticker.rotation||0}deg) scaleX(${sticker.flipX?-1:1}) scaleY(${sticker.flipY?-1:1})`,
+                  cursor:"grab", zIndex:isSelected?10:5,
+                  filter:"drop-shadow(0 3px 8px rgba(0,0,0,0.5))",
+                  outline:isSelected?`2px dashed ${theme.accent}`:"none",
+                  outlineOffset:"3px", borderRadius:4,
+                }}
+                onMouseDown={e => handleStickerDragStart(e, sticker.uid)}
+                onTouchStart={e => handleStickerDragStart(e, sticker.uid)}
+                onDoubleClick={() => { setPlacedStickers(prev => prev.filter(s => s.uid !== sticker.uid)); setSelectedUid(null); }}
+                title="Drag · Double-click to remove"
+              >
+                <img src={img.src} alt={sticker.key} style={{ width:"100%", height:"100%", pointerEvents:"none", display:"block" }} />
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{ position:"absolute", inset:0, background:"white", opacity:showFlash?1:0, transition:showFlash?"none":"opacity 0.35s", pointerEvents:"none", zIndex:8 }} />
+        {countdown !== null && (
+          <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", zIndex:9 }}>
+            <span style={{ fontSize:"min(24vw,130px)", fontWeight:"bold", color:theme.accent, textShadow:`0 0 60px ${theme.glow}`, lineHeight:1 }}>{countdown}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Sticker controls */}
+      <StickerControls />
+
+      {/* Filters */}
+      <div>
+        <div style={{ fontSize:sz.labelFont, fontWeight:"bold", color:theme.accent, letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:8, fontFamily:displayFont }}>Filters</div>
+        <div style={{ display:"flex", gap:7, flexWrap:"wrap" }}>
+          {CAMERA_FILTERS.map(f => (
+            <button key={f.id} onClick={() => setSelectedFilter(f.id)} style={{
+              padding:sz.chipPad, borderRadius:999,
+              border:`2px solid ${f.id===selectedFilter ? theme.accent : theme.accent+"35"}`,
+              background:f.id===selectedFilter ? theme.accent+"25" : "transparent",
+              color:f.id===selectedFilter ? theme.accent : theme.mutedColor,
+              fontSize:sz.chipFont, cursor:"pointer", fontFamily:displayFont, transition:"all 0.15s",
+            }}>{f.name}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Border */}
+      <BorderPreview selectedBorder={selectedBorder} onSelect={setSelectedBorder} theme={theme} />
+
+      {/* Action buttons */}
+      <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+        <button onClick={handleSnap} disabled={!canSnap} style={{
+          padding:sz.snapPad, borderRadius:999, border:"none", flex:1,
+          background:canSnap ? theme.accent : theme.mutedColor,
+          color:"#000", fontWeight:"bold", fontSize:sz.snapFont,
+          cursor:canSnap?"pointer":"default", fontFamily:displayFont,
+          boxShadow:canSnap?`0 0 26px ${theme.glow}bb`:"none",
+          opacity:canSnap?1:0.45, transition:"all 0.2s",
+        }}>
+          {countdown!==null ? `⏱ ${countdown}` : activeSlot>=3 ? "Strip Full!" : `📸 Snap (${3-activeSlot} left)`}
+        </button>
+        <button onClick={() => { setPlacedStickers([]); setSelectedUid(null); }}
+          style={{ padding:sz.btnPad, borderRadius:999, border:`2px solid ${theme.accent}`, background:"transparent", color:theme.accent, fontSize:sz.btnFont, cursor:"pointer", fontFamily:displayFont }}>
+          Clear
+        </button>
+        <button onClick={() => { setPhotoStrip([null,null,null]); setActiveSlot(0); }}
+          style={{ padding:sz.btnPad, borderRadius:999, border:`2px solid ${theme.accent}`, background:"transparent", color:theme.accent, fontSize:sz.btnFont, cursor:"pointer", fontFamily:displayFont }}>
+          Reset
+        </button>
+      </div>
+    </div>
+  );
+
+  // ── Strip panel ────────────────────────────────────────────────────────────
+  const StripPanel = () => (
+    <div style={{ display:"flex", flexDirection:"column", gap:10, background:theme.panelBackground, borderRadius:18, border:`2px solid ${theme.accent}`, padding:sz.panelPad, alignItems:"center", boxSizing:"border-box", boxShadow:`0 0 32px ${theme.glow}28` }}>
+      <div style={{ fontSize:16, fontWeight:"bold", color:theme.accent, letterSpacing:"0.08em", textTransform:"uppercase", textAlign:"center", fontFamily:displayFont }}>{theme.emoji} Strip</div>
+      <div style={{ display:"flex", flexDirection:isMobile?"row":"column", gap:8, width:"100%" }}>
+        {[0,1,2].map(i => {
+          const filled=!!photoStrip[i], active=i===activeSlot&&!filled;
+          return (
+            <div key={i} style={{ position:"relative", flex:isMobile?"1":undefined, width:isMobile?undefined:"100%", aspectRatio:"4/3", borderRadius:10, border:`2px ${filled?"solid":"dashed"} ${active?theme.accent:filled?theme.accent+"80":theme.accent+"30"}`, background:filled?"#000":theme.accentDim+"22", overflow:"hidden", boxShadow:active?`0 0 18px ${theme.glow}70`:"none" }}>
+              {filled ? (
+                <>
+                  <img src={photoStrip[i]} alt={`Photo ${i+1}`} style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }} />
+                  <button onClick={() => handleRedo(i)} style={{ position:"absolute", top:5, right:5, background:"rgba(0,0,0,0.82)", border:"none", color:theme.accent, borderRadius:999, fontSize:sz.redoFont, cursor:"pointer", padding:"4px 10px", fontFamily:displayFont, zIndex:3, fontWeight:"bold" }}>↺ Redo</button>
+                </>
+              ) : (
+                <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", color:theme.mutedColor, fontSize:sz.slotFont, fontWeight:"bold" }}>{i+1}</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <button onClick={handleDownload} disabled={filledPhotoCount===0}
+        style={{ width:"100%", padding:sz.dlPad, borderRadius:999, border:"none", background:theme.accent, color:"#000", fontWeight:"bold", fontSize:sz.dlFont, cursor:filledPhotoCount===0?"default":"pointer", fontFamily:displayFont, boxShadow:`0 0 20px ${theme.glow}66`, opacity:filledPhotoCount===0?0.4:1 }}>
+        ⬇ Download Strip
+      </button>
+      <div style={{ fontSize:14, color:theme.mutedColor, textAlign:"center", fontFamily:displayFont }}>{filledPhotoCount} / 3 photos</div>
+    </div>
+  );
+
+  // ── Sticker picker panel ───────────────────────────────────────────────────
+  const StickerPanel = () => (
+    <div style={{ display:"flex", flexDirection:"column", gap:10, background:theme.panelBackground, borderRadius:18, border:`2px solid ${theme.accent}30`, padding:sz.panelPad, boxSizing:"border-box", overflow:"hidden", minWidth:0 }}>
+      <div style={{ fontSize:16, fontWeight:"bold", color:theme.accent, letterSpacing:"0.08em", textTransform:"uppercase", fontFamily:displayFont }}>Stickers</div>
+      <div style={{ display:"grid", gridTemplateColumns:sz.stickerCols, gap:6, width:"100%", minWidth:0 }}>
+        {currentStickerKeys.map(key => {
+          const img = getCachedImage(key);
+          return (
+            <button key={key} onClick={() => handleAddSticker(key)} title={`Add ${key}`}
+              style={{ minWidth:0, width:"100%", aspectRatio:"1", borderRadius:10, border:`2px solid ${theme.accent}30`, background:theme.accentDim+"28", cursor:"pointer", padding:5, display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", transition:"transform 0.12s, border-color 0.12s", boxSizing:"border-box", fontSize:22 }}
+              onMouseEnter={e => { e.currentTarget.style.transform="scale(1.1)"; e.currentTarget.style.borderColor=theme.accent; }}
+              onMouseLeave={e => { e.currentTarget.style.transform="scale(1)"; e.currentTarget.style.borderColor=theme.accent+"30"; }}
+            >
+              {img.complete && img.naturalWidth > 0 && !img.dataset.failed
+                ? <img src={img.src} alt={key} style={{ width:"70%", height:"70%", objectFit:"contain", pointerEvents:"none", display:"block", margin:"auto" }} />
+                : "⏳"
+              }
+            </button>
+          );
+        })}
+      </div>
+      <div style={{ fontSize:sz.tipFont, color:theme.mutedColor, lineHeight:1.6, fontFamily:displayFont }}>
+        Tap to place · Drag to move · Double-tap removes · Tap sticker to resize/rotate
+      </div>
+    </div>
+  );
+
   return (
     <div
       style={{
         minHeight:"100vh", background:theme.backgroundGradient,
-        fontFamily:theme.font, display:"flex", flexDirection:"column",
+        fontFamily:displayFont, display:"flex", flexDirection:"column",
         alignItems:"center", overflowX:"hidden",
       }}
       onMouseMove={handleDragMove} onMouseUp={handleDragEnd}
@@ -214,285 +434,94 @@ useEffect(() => {
     >
 
       {/* HEADER */}
-      <div style={{ width:"100%", padding:isMobile?"16px 12px":"24px 32px", textAlign:"center", borderBottom:`1px solid ${theme.accent}30` }}>
-        <h1 style={{ fontSize:sz.titleFont, color:theme.textColor, fontWeight:"bold", textShadow:`0 0 30px ${theme.glow}`, margin:0, letterSpacing:2 }}>
+      <div style={{ width:"100%", padding:isMobile?"14px 12px":"24px 32px", textAlign:"center", borderBottom:`1px solid ${theme.accent}30` }}>
+        <h1 style={{ fontSize:sz.titleFont, color:theme.textColor, fontWeight:"bold", textShadow:`0 0 30px ${theme.glow}`, margin:0, letterSpacing:1, fontFamily:displayFont }}>
           ✦ Photo Booth ✦
         </h1>
       </div>
 
       {/* THEME BAR */}
-      <div style={{ display:"flex", gap:8, flexWrap:"wrap", justifyContent:"center", padding:isMobile?"10px":"14px 24px", borderBottom:`1px solid ${theme.accent}20`, width:"100%", boxSizing:"border-box" }}>
+      <div style={{ display:"flex", gap:6, flexWrap:"wrap", justifyContent:"center", padding:isMobile?"8px 10px":"14px 24px", borderBottom:`1px solid ${theme.accent}20`, width:"100%", boxSizing:"border-box" }}>
         {Object.entries(THEMES).map(([k,v]) => (
-          <button key={k} onClick={() => { setSelectedTheme(k);  setSelectedUid(null); }} style={{
+          <button key={k} onClick={() => { setSelectedTheme(k); setSelectedUid(null); }} style={{
             padding:sz.themePad, borderRadius:999,
             border:`2px solid ${k===selectedTheme ? theme.accent : theme.accent+"30"}`,
             background:k===selectedTheme ? theme.accent+"25" : "transparent",
             color:k===selectedTheme ? theme.accent : theme.mutedColor,
-            cursor:"pointer", fontSize:sz.themeFont, fontFamily:"inherit",
+            cursor:"pointer", fontSize:sz.themeFont, fontFamily:displayFont,
             fontWeight:k===selectedTheme?"bold":"normal", whiteSpace:"nowrap", transition:"all 0.15s",
           }}>{v.emoji} {v.name}</button>
         ))}
       </div>
 
-      {/* MAIN LAYOUT */}
-      <div style={{ display:"flex", flexDirection:isMobile?"column":"row", gap:sz.gap, padding:sz.mainPad, width:"100%", maxWidth:1280, alignItems:"flex-start", justifyContent:"center", boxSizing:"border-box" }}>
+      {/* ── MOBILE LAYOUT ── */}
+      {isMobile ? (
+        <div style={{ width:"100%", display:"flex", flexDirection:"column", flex:1 }}>
 
-        {/* LEFT: Camera + controls */}
-        <div style={{ display:"flex", flexDirection:"column", gap:sz.gap, flex:isMobile?"none":"1 1 0", minWidth:0, width:isMobile?"100%":undefined, maxWidth:isMobile?"100%":640 }}>
-
-          {/* Camera viewport */}
-          <div style={{ position:"relative", width:"100%", aspectRatio:"4/3", borderRadius:16, overflow:"hidden", border:`3px solid ${theme.accent}`, boxShadow:`0 0 44px ${theme.glow}55, 0 8px 32px rgba(0,0,0,0.45)`, background:"#000" }}>
-            <video ref={videoRef} autoPlay muted playsInline style={{ position:"absolute", opacity:0, top:0, left:0, width:1, height:1 }} />
-            {cameraError ? (
-              <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", color:theme.mutedColor, gap:14 }}>
-                <span style={{ fontSize:56 }}>📷</span>
-                <span style={{ fontSize:17, textAlign:"center", padding:"0 28px" }}>Camera unavailable — please allow permission</span>
-              </div>
-            ) : (
-              <canvas ref={canvasRef} width={480} height={360} style={{ position:"absolute", top:0, left:0, width:"100%", height:"100%" }} />
-            )}
-
-            {/* Sticker layer */}
-            <div ref={stickerLayer} style={{ position:"absolute", inset:0 }}>
-              {placedStickers.map(sticker => {
-                const img = getCachedImage(sticker.key);
-                const isSelected = sticker.uid === selectedUid;
-                const pct = (v, base) => `${(v/base)*100}%`;
-                return (
-                  <div
-                    key={sticker.uid}
-                    data-sticker="true"
-                    style={{
-                      position:"absolute",
-                      left: pct(sticker.x, 480),
-                      top:  pct(sticker.y, 360),
-                      width: pct(sticker.size, 480),
-                      aspectRatio:"1",
-                      transform:`translate(-50%,-50%) rotate(${sticker.rotation||0}deg) scaleX(${sticker.flipX ? -1 : 1}) scaleY(${sticker.flipY ? -1 : 1})`,
-                      cursor:"grab",
-                      zIndex: isSelected ? 10 : 5,
-                      filter:"drop-shadow(0 3px 8px rgba(0,0,0,0.5))",
-                      outline: isSelected ? `2px dashed ${theme.accent}` : "none",
-                      outlineOffset: "3px",
-                      borderRadius: 4,
-                    }}
-                    onMouseDown={e => handleStickerDragStart(e, sticker.uid)}
-                    onTouchStart={e => handleStickerDragStart(e, sticker.uid)}
-                    onDoubleClick={() => {
-                      setPlacedStickers(prev => prev.filter(s => s.uid !== sticker.uid));
-                      setSelectedUid(null);
-                    }}
-                    title="Drag · Double-click to remove"
-                  >
-                    <img src={img.src} alt={sticker.key} style={{ width:"100%", height:"100%", pointerEvents:"none", display:"block" }} />
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Flash */}
-            <div style={{ position:"absolute", inset:0, background:"white", opacity:showFlash?1:0, transition:showFlash?"none":"opacity 0.35s", pointerEvents:"none", zIndex:8 }} />
-
-            {/* Countdown */}
-            {countdown !== null && (
-              <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", zIndex:9 }}>
-                <span style={{ fontSize:"min(24vw,130px)", fontWeight:"bold", color:theme.accent, textShadow:`0 0 60px ${theme.glow}`, lineHeight:1 }}>{countdown}</span>
-              </div>
-            )}
+          {/* Mobile tab content */}
+          <div style={{ padding:"12px 12px", flex:1 }}>
+            {mobileTab === "camera"   && <CameraPanel />}
+            {mobileTab === "stickers" && <StickerPanel />}
+            {mobileTab === "strip"    && <StripPanel />}
           </div>
 
-          {/* ── Sticker resize + rotate controls (shows when a sticker is selected) ── */}
-          {selectedSticker && (
-            <div data-sticker="true" style={{
-              display:"flex", flexDirection:"column", gap:8,
-              background: theme.panelBackground,
-              border:`1.5px solid ${theme.accent}50`,
-              borderRadius:12, padding:"12px 14px",
-            }}>
-              <div style={{ fontSize:11, fontWeight:"bold", color:theme.accent, textTransform:"uppercase", letterSpacing:"0.08em" }}>
-                Selected sticker
-              </div>
-
-              {/* Size slider */}
-              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                <span style={{ fontSize:12, color:theme.mutedColor, width:44 }}>Size</span>
-                <input type="range" min={24} max={200} value={selectedSticker.size}
-                  onChange={e => updateSticker(selectedUid, { size: Number(e.target.value) })}
-                  style={{ flex:1, accentColor: theme.accent }}
-                />
-                <span style={{ fontSize:12, color:theme.mutedColor, width:32, textAlign:"right" }}>{selectedSticker.size}px</span>
-              </div>
-
-              {/* Rotation slider */}
-              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                <span style={{ fontSize:12, color:theme.mutedColor, width:44 }}>Rotate</span>
-                <input type="range" min={-180} max={180} value={selectedSticker.rotation||0}
-                  onChange={e => updateSticker(selectedUid, { rotation: Number(e.target.value) })}
-                  style={{ flex:1, accentColor: theme.accent }}
-                />
-                <span style={{ fontSize:12, color:theme.mutedColor, width:32, textAlign:"right" }}>{selectedSticker.rotation||0}°</span>
-              </div>
-
-              {/* Quick rotate buttons + delete */}
-              <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-                {[
-                  { label:"↺ -15°", delta:-15 },
-                  { label:"↻ +15°", delta:+15 },
-                  { label:"↺ -45°", delta:-45 },
-                  { label:"↻ +45°", delta:+45 },
-                  { label:"Reset",  reset:true },
-                ].map(btn => (
-                  <button key={btn.label}
-                    onClick={() => {
-                      if (btn.reset) updateSticker(selectedUid, { rotation:0, size:64, flipX:false, flipY:false });
-                      else updateSticker(selectedUid, { rotation: ((selectedSticker.rotation||0) + btn.delta + 360) % 360 });
-                    }}
-                    style={{
-                      padding:"4px 10px", borderRadius:999, fontSize:11,
-                      border:`1.5px solid ${theme.accent}50`,
-                      background:"transparent", color:theme.accent,
-                      cursor:"pointer", fontFamily:"inherit",
-                    }}
-                  >{btn.label}</button>
-                ))}
-                <button
-                  onClick={() => { setPlacedStickers(prev => prev.filter(s => s.uid !== selectedUid)); setSelectedUid(null); }}
-                  style={{
-                    padding:"4px 10px", borderRadius:999, fontSize:11,
-                    border:"1.5px solid #ef4444",
-                    background:"transparent", color:"#ef4444",
-                    cursor:"pointer", fontFamily:"inherit", marginLeft:"auto",
-                  }}
-                >🗑 Remove</button>
-              </div>
-
-              {/* Flip buttons */}
-              <div style={{ display:"flex", gap:6 }}>
-                <button
-                  onClick={() => updateSticker(selectedUid, { flipX: !selectedSticker.flipX })}
-                  style={{
-                    padding:"4px 12px", borderRadius:999, fontSize:11,
-                    border:`1.5px solid ${selectedSticker.flipX ? theme.accent : theme.accent+"50"}`,
-                    background: selectedSticker.flipX ? theme.accent+"25" : "transparent",
-                    color: theme.accent, cursor:"pointer", fontFamily:"inherit",
-                  }}
-                >⇔ Flip Horizontal</button>
-                <button
-                  onClick={() => updateSticker(selectedUid, { flipY: !selectedSticker.flipY })}
-                  style={{
-                    padding:"4px 12px", borderRadius:999, fontSize:11,
-                    border:`1.5px solid ${selectedSticker.flipY ? theme.accent : theme.accent+"50"}`,
-                    background: selectedSticker.flipY ? theme.accent+"25" : "transparent",
-                    color: theme.accent, cursor:"pointer", fontFamily:"inherit",
-                  }}
-                >⇕ Flip Vertical</button>
-              </div>
-            </div>
-          )}
-
-          {/* Filters */}
-          <div>
-            <div style={{ fontSize:sz.labelFont, fontWeight:"bold", color:theme.accent, letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:8 }}>Filters</div>
-            <div style={{ display:"flex", gap:7, flexWrap:"wrap" }}>
-              {CAMERA_FILTERS.map(f => (
-                <button key={f.id} onClick={() => setSelectedFilter(f.id)} style={{
-                  padding:sz.chipPad, borderRadius:999,
-                  border:`2px solid ${f.id===selectedFilter ? theme.accent : theme.accent+"35"}`,
-                  background:f.id===selectedFilter ? theme.accent+"25" : "transparent",
-                  color:f.id===selectedFilter ? theme.accent : theme.mutedColor,
-                  fontSize:sz.chipFont, cursor:"pointer", fontFamily:"inherit", transition:"all 0.15s",
-                }}>{f.name}</button>
-              ))}
-            </div>
-          </div>
-
-          {/* Border picker */}
-          <BorderPreview selectedBorder={selectedBorder} onSelect={setSelectedBorder} theme={theme} />
-
-          {/* Action buttons */}
-          <div style={{ display:"flex", gap:10, flexWrap:"wrap", alignItems:"center" }}>
-            <button onClick={handleSnap} disabled={!canSnap} style={{
-              padding:sz.snapPad, borderRadius:999, border:"none",
-              background:canSnap ? theme.accent : theme.mutedColor,
-              color:"#000", fontWeight:"bold", fontSize:sz.snapFont,
-              cursor:canSnap?"pointer":"default", fontFamily:"inherit",
-              boxShadow:canSnap?`0 0 26px ${theme.glow}bb`:"none",
-              opacity:canSnap?1:0.45, flex:isMobile?"1":undefined, transition:"all 0.2s",
-            }}>
-              {countdown!==null ? `⏱ ${countdown}` : activeSlot>=3 ? "Strip Full!" : `📸 Snap  (${3-activeSlot} left)`}
-            </button>
-            <button onClick={() => { setPlacedStickers([]); setSelectedUid(null); }} style={{ padding:sz.btnPad, borderRadius:999, border:`2px solid ${theme.accent}`, background:"transparent", color:theme.accent, fontSize:sz.btnFont, cursor:"pointer", fontFamily:"inherit" }}>
-              Clear Stickers
-            </button>
-            <button onClick={() => { setPhotoStrip([null,null,null]); setActiveSlot(0); }} style={{ padding:sz.btnPad, borderRadius:999, border:`2px solid ${theme.accent}`, background:"transparent", color:theme.accent, fontSize:sz.btnFont, cursor:"pointer", fontFamily:"inherit" }}>
-              Reset
-            </button>
+          {/* Mobile bottom tab bar */}
+          <div style={{
+            position:"sticky", bottom:0,
+            display:"flex", borderTop:`1px solid ${theme.accent}30`,
+            background:theme.panelBackground,
+            zIndex:20,
+          }}>
+            {[
+              { id:"camera",   icon:"📷", label:"Camera" },
+              { id:"stickers", icon:"🎨", label:"Stickers" },
+              { id:"strip",    icon:"🖼️", label:`Strip ${filledPhotoCount}/3` },
+            ].map(tab => (
+              <button key={tab.id} onClick={() => setMobileTab(tab.id)}
+                style={{
+                  flex:1, padding:"12px 4px 10px",
+                  background: mobileTab===tab.id ? theme.accent+"18" : "transparent",
+                  border:"none", borderTop:`3px solid ${mobileTab===tab.id ? theme.accent : "transparent"}`,
+                  color: mobileTab===tab.id ? theme.accent : theme.mutedColor,
+                  cursor:"pointer", fontFamily:displayFont,
+                  display:"flex", flexDirection:"column", alignItems:"center", gap:3,
+                  transition:"all 0.15s",
+                }}
+              >
+                <span style={{ fontSize:22 }}>{tab.icon}</span>
+                <span style={{ fontSize:12, fontWeight: mobileTab===tab.id?"bold":"normal" }}>{tab.label}</span>
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* MIDDLE: Strip */}
-        <div style={{ display:"flex", flexDirection:"column", gap:10, background:theme.panelBackground, borderRadius:18, border:`2px solid ${theme.accent}`, padding:sz.panelPad, flex:"0 0 auto", width:isMobile?"100%":sz.stripW, alignItems:"center", boxSizing:"border-box", boxShadow:`0 0 32px ${theme.glow}28` }}>
-          <div style={{ fontSize:sz.labelFont+2, fontWeight:"bold", color:theme.accent, letterSpacing:"0.1em", textTransform:"uppercase", textAlign:"center" }}>{theme.emoji} Strip</div>
-          <div style={{ display:"flex", flexDirection:isMobile?"row":"column", gap:8, width:"100%" }}>
-            {[0,1,2].map(i => {
-              const filled=!!photoStrip[i], active=i===activeSlot&&!filled;
-              return (
-                <div key={i} style={{ position:"relative", flex:isMobile?"1":undefined, width:isMobile?undefined:"100%", aspectRatio:"4/3", borderRadius:10, border:`2px ${filled?"solid":"dashed"} ${active?theme.accent:filled?theme.accent+"80":theme.accent+"30"}`, background:filled?"#000":theme.accentDim+"22", overflow:"hidden", boxShadow:active?`0 0 18px ${theme.glow}70`:"none" }}>
-                  {filled ? (
-                    <>
-                      <img src={photoStrip[i]} alt={`Photo ${i+1}`} style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }} />
-                      <button onClick={() => handleRedo(i)} style={{ position:"absolute", top:5, right:5, background:"rgba(0,0,0,0.82)", border:"none", color:theme.accent, borderRadius:999, fontSize:sz.redoFont, cursor:"pointer", padding:"4px 10px", fontFamily:"inherit", zIndex:3, fontWeight:"bold" }}>↺ Redo</button>
-                    </>
-                  ) : (
-                    <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", color:theme.mutedColor, fontSize:sz.slotFont, fontWeight:"bold" }}>{i+1}</div>
-                  )}
-                </div>
-              );
-            })}
+      ) : (
+        // ── DESKTOP LAYOUT ──
+        <>
+          <div style={{ display:"flex", gap:sz.gap, padding:sz.mainPad, width:"100%", maxWidth:1280, alignItems:"flex-start", justifyContent:"center", boxSizing:"border-box" }}>
+            <div style={{ display:"flex", flexDirection:"column", gap:sz.gap, flex:"1 1 0", minWidth:0, maxWidth:640 }}>
+              <CameraPanel />
+            </div>
+            <div style={{ flex:"0 0 auto", width:sz.stripW }}>
+              <StripPanel />
+            </div>
+            <div style={{ flex:"0 0 auto", width:270 }}>
+              <StickerPanel />
+            </div>
           </div>
-          <button onClick={handleDownload} disabled={filledPhotoCount===0} style={{ width:"100%", padding:sz.dlPad, borderRadius:999, border:"none", background:theme.accent, color:"#000", fontWeight:"bold", fontSize:sz.dlFont, cursor:filledPhotoCount===0?"default":"pointer", fontFamily:"inherit", boxShadow:`0 0 20px ${theme.glow}66`, opacity:filledPhotoCount===0?0.4:1 }}>
-            ⬇ Download Strip
-          </button>
-          <div style={{ fontSize:sz.labelFont, color:theme.mutedColor, textAlign:"center" }}>{filledPhotoCount} / 3 photos</div>
-        </div>
 
-        {/* RIGHT: Stickers */}
-        <div style={{ display:"flex", flexDirection:"column", gap:10, background:theme.panelBackground, borderRadius:18, border:`2px solid ${theme.accent}30`, padding:sz.panelPad, flex:"0 0 auto", width:isMobile?"100%":270, boxSizing:"border-box", overflow:"hidden", minWidth:0 }}>
-          <div style={{ fontSize:sz.labelFont+2, fontWeight:"bold", color:theme.accent, letterSpacing:"0.1em", textTransform:"uppercase" }}>Stickers</div>
-          <div style={{ display:"grid", gridTemplateColumns:sz.stickerCols, gap:6, width:"100%", minWidth:0 }}>
-            {currentStickerKeys.map(key => {
-              const img = getCachedImage(key);
-              return (
-                <button key={key} onClick={() => handleAddSticker(key)} title={`Add ${key}`}
-                  style={{ minWidth:0, width:"100%", aspectRatio:"1", borderRadius:10, border:`2px solid ${theme.accent}30`, background:theme.accentDim+"28", cursor:"pointer", padding:5, display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", transition:"transform 0.12s, border-color 0.12s", boxSizing:"border-box", fontSize:22 }}
-                  onMouseEnter={e => { e.currentTarget.style.transform="scale(1.1)"; e.currentTarget.style.borderColor=theme.accent; }}
-                  onMouseLeave={e => { e.currentTarget.style.transform="scale(1)";   e.currentTarget.style.borderColor=theme.accent+"30"; }}
-                >
-                  {img.complete && img.naturalWidth > 0 && !img.dataset.failed
-                    ? <img src={img.src} alt={key} style={{ width:"70%", height:"70%", objectFit:"contain", pointerEvents:"none", display:"block", margin:"auto" }} />
-                    :"⏳"
-                  }
-                </button>
-              );
-            })}
+          {/* CREDITS */}
+          <div style={{ width:"100%", padding:"14px 20px", borderTop:`1px solid ${theme.accent}15`, textAlign:"center", fontSize:12, color:theme.mutedColor, marginTop:"auto", boxSizing:"border-box", fontFamily:displayFont }}>
+            Stickers by{" "}
+            <a href="https://www.flaticon.com" target="_blank" rel="noreferrer" style={{ color:theme.accent, textDecoration:"none", fontWeight:"bold" }}>Flaticon</a>
+            {" · "}
+            Emoji by{" "}
+            <a href="https://openmoji.org" target="_blank" rel="noreferrer" style={{ color:theme.accent, textDecoration:"none", fontWeight:"bold" }}>OpenMoji</a>
+            {" · "}
+            Built with React &amp; Canvas API
           </div>
-          <div style={{ fontSize:sz.tipFont, color:theme.mutedColor, lineHeight:1.6 }}>
-            Tap to place · Drag to move · Double-tap removes · Tap sticker to resize/rotate
-          </div>
-        </div>
-
-      </div>
-
-      {/* CREDITS */}
-      <div style={{ width:"100%", padding:"14px 20px", borderTop:`1px solid ${theme.accent}15`, textAlign:"center", fontSize:12, color:theme.mutedColor, marginTop:"auto", boxSizing:"border-box" }}>
-        Stickers by{" "}
-        <a href="https://www.flaticon.com" target="_blank" rel="noreferrer" style={{ color:theme.accent, textDecoration:"none", fontWeight:"bold" }}>Flaticon</a>
-        {" · "}
-        Emoji by{" "}
-        <a href="https://openmoji.org" target="_blank" rel="noreferrer" style={{ color:theme.accent, textDecoration:"none", fontWeight:"bold" }}>OpenMoji</a>
-        {" · "}
-        Built with React &amp; Canvas API
-      </div>
+        </>
+      )}
 
     </div>
   );
