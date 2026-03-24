@@ -57,7 +57,7 @@ export const STICKER_URLS = {
   script_s13:  "https://cdn-icons-png.flaticon.com/512/8763/8763197.png",
   script_s14:  "https://cdn-icons-png.flaticon.com/512/8763/8763254.png",
   script_s15:  "https://cdn-icons-png.flaticon.com/512/8763/8763259.png",
-  script_s16:  "https://www.flaticon.com/free-sticker/thursday_8763248.png",
+  script_s16:  "https://www.flaticon.com/free-sticker/512/8763248.png",
   script_s17:  "https://cdn-icons-png.flaticon.com/512/8763/8763125.png",
   script_s18:  "https://cdn-icons-png.flaticon.com/512/8763/8763217.png",
   script_s19:  "https://cdn-icons-png.flaticon.com/512/8763/8763243.png",
