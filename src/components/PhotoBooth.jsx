@@ -24,6 +24,8 @@ export default function PhotoBooth() {
   const [isMobile,       setIsMobile]       = useState(false);
   const [mobileTab,      setMobileTab]      = useState("camera"); // camera | stickers | strip
 
+  const [isLandscape, setIsLandscape] = useState(false);
+
   const stickerLayer = useRef(null);
   const countdownRef = useRef(null);
 
@@ -36,10 +38,19 @@ export default function PhotoBooth() {
   useEffect(() => { preloadAllStickers(); }, []);
 
   useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 760);
+    const check = () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      setIsMobile(w < 760);
+      setIsLandscape(w > h);
+    };
     check();
     window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
+    window.addEventListener("orientationchange", () => setTimeout(check, 100));
+    return () => {
+      window.removeEventListener("resize", check);
+      window.removeEventListener("orientationchange", check);
+    };
   }, []);
 
   useEffect(() => () => clearInterval(countdownRef.current), []);
@@ -166,17 +177,28 @@ export default function PhotoBooth() {
     const sticker = placedStickers.find(s => s.uid === uid);
     const clientX = event.touches ? event.touches[0].clientX : event.clientX;
     const clientY = event.touches ? event.touches[0].clientY : event.clientY;
+    // Scale screen coords to canvas coords (480×360)
+    const scaleX = 480 / layerRect.width;
+    const scaleY = 360 / layerRect.height;
     setDraggingUid(uid);
-    setDragOffset({ x: clientX-layerRect.left-sticker.x, y: clientY-layerRect.top-sticker.y });
+    setDragOffset({
+      x: (clientX - layerRect.left) * scaleX - sticker.x,
+      y: (clientY - layerRect.top)  * scaleY - sticker.y,
+    });
   };
 
   const handleDragMove = useCallback((event) => {
     if (!draggingUid || !stickerLayer.current) return;
+    // Prevent page scroll while dragging sticker on mobile
+    if (event.cancelable) event.preventDefault();
     const layerRect = stickerLayer.current.getBoundingClientRect();
     const clientX = event.touches ? event.touches[0].clientX : event.clientX;
     const clientY = event.touches ? event.touches[0].clientY : event.clientY;
-    const newX = Math.max(0, Math.min(480, clientX-layerRect.left-dragOffset.x));
-    const newY = Math.max(0, Math.min(360, clientY-layerRect.top-dragOffset.y));
+    // Scale screen coords to canvas coords
+    const scaleX = 480 / layerRect.width;
+    const scaleY = 360 / layerRect.height;
+    const newX = Math.max(0, Math.min(480, (clientX - layerRect.left) * scaleX - dragOffset.x));
+    const newY = Math.max(0, Math.min(360, (clientY - layerRect.top)  * scaleY - dragOffset.y));
     updateSticker(draggingUid, { x: newX, y: newY });
   }, [draggingUid, dragOffset]);
 
@@ -188,7 +210,16 @@ export default function PhotoBooth() {
   const selectedSticker = placedStickers.find(s => s.uid === selectedUid);
 
   // ── Size tokens ────────────────────────────────────────────────────────────
-  const sz = isMobile ? {
+  const sz = isMobile && isLandscape ? {
+    // Mobile landscape — more compact, side by side where possible
+    titleFont:16, themeFont:11, themePad:"4px 10px",
+    labelFont:11, chipFont:12, chipPad:"5px 10px",
+    snapFont:14, snapPad:"10px 0", btnFont:12, btnPad:"9px 12px",
+    stripW:"100%", slotFont:16, redoFont:10, dlFont:13, dlPad:"10px 0",
+    panelPad:"10px", gap:8, mainPad:"8px 10px",
+    stickerCols:"repeat(auto-fill, minmax(52px, 1fr))", tipFont:10,
+  } : isMobile ? {
+    // Mobile portrait
     titleFont:20, themeFont:13, themePad:"6px 14px",
     labelFont:13, chipFont:14, chipPad:"8px 14px",
     snapFont:16, snapPad:"14px 0", btnFont:14, btnPad:"12px 16px",
@@ -196,6 +227,7 @@ export default function PhotoBooth() {
     panelPad:"14px", gap:12, mainPad:"10px 12px",
     stickerCols:"repeat(auto-fill, minmax(58px, 1fr))", tipFont:12,
   } : {
+    // Desktop
     titleFont:34, themeFont:14, themePad:"8px 18px",
     labelFont:13, chipFont:14, chipPad:"8px 16px",
     snapFont:19, snapPad:"17px 40px", btnFont:15, btnPad:"14px 24px",
@@ -456,40 +488,50 @@ export default function PhotoBooth() {
 
       {/* ── MOBILE LAYOUT ── */}
       {isMobile ? (
-        <div style={{ width:"100%", display:"flex", flexDirection:"column", flex:1 }}>
+        <div style={{ width:"100%", display:"flex", flexDirection: isLandscape ? "row" : "column", flex:1, overflow:"hidden" }}>
 
-          {/* Mobile tab content */}
-          <div style={{ padding:"12px 12px", flex:1 }}>
-            {mobileTab === "camera"   && <CameraPanel />}
-            {mobileTab === "stickers" && <StickerPanel />}
-            {mobileTab === "strip"    && <StripPanel />}
+          {/* Tab content area */}
+          <div style={{ flex:1, overflowY:"auto", padding: isLandscape ? "8px 10px" : "12px 12px" }}>
+            <div style={{ display: mobileTab === "camera"   ? "block" : "none" }}><CameraPanel /></div>
+            <div style={{ display: mobileTab === "stickers" ? "block" : "none" }}><StickerPanel /></div>
+            <div style={{ display: mobileTab === "strip"    ? "block" : "none" }}><StripPanel /></div>
           </div>
 
-          {/* Mobile bottom tab bar */}
+          {/* Tab bar — bottom in portrait, right side in landscape */}
           <div style={{
-            position:"sticky", bottom:0,
-            display:"flex", borderTop:`1px solid ${theme.accent}30`,
-            background:theme.panelBackground,
+            display:"flex",
+            flexDirection: isLandscape ? "column" : "row",
+            borderTop:    isLandscape ? "none" : `1px solid ${theme.accent}30`,
+            borderLeft:   isLandscape ? `1px solid ${theme.accent}30` : "none",
+            background: theme.panelBackground,
             zIndex:20,
+            position: isLandscape ? "sticky" : "sticky",
+            bottom:0, right:0,
+            minWidth: isLandscape ? 72 : undefined,
           }}>
             {[
               { id:"camera",   icon:"📷", label:"Camera" },
               { id:"stickers", icon:"🎨", label:"Stickers" },
-              { id:"strip",    icon:"🖼️", label:`Strip ${filledPhotoCount}/3` },
+              { id:"strip",    icon:"🖼️", label:`Strip\n${filledPhotoCount}/3` },
             ].map(tab => (
               <button key={tab.id} onClick={() => setMobileTab(tab.id)}
                 style={{
-                  flex:1, padding:"12px 4px 10px",
+                  flex: isLandscape ? "none" : 1,
+                  padding: isLandscape ? "16px 8px" : "12px 4px 10px",
                   background: mobileTab===tab.id ? theme.accent+"18" : "transparent",
-                  border:"none", borderTop:`3px solid ${mobileTab===tab.id ? theme.accent : "transparent"}`,
+                  border:"none",
+                  borderTop:  isLandscape ? `3px solid ${mobileTab===tab.id ? theme.accent : "transparent"}` : "none",
+                  borderLeft: isLandscape ? "none" : "none",
+                  borderBottom: !isLandscape ? "none" : "none",
+                  borderRight: "none",
                   color: mobileTab===tab.id ? theme.accent : theme.mutedColor,
                   cursor:"pointer", fontFamily:displayFont,
                   display:"flex", flexDirection:"column", alignItems:"center", gap:3,
                   transition:"all 0.15s",
                 }}
               >
-                <span style={{ fontSize:22 }}>{tab.icon}</span>
-                <span style={{ fontSize:12, fontWeight: mobileTab===tab.id?"bold":"normal" }}>{tab.label}</span>
+                <span style={{ fontSize: isLandscape ? 20 : 22 }}>{tab.icon}</span>
+                <span style={{ fontSize:11, fontWeight: mobileTab===tab.id?"bold":"normal", textAlign:"center", whiteSpace:"pre-line" }}>{tab.label}</span>
               </button>
             ))}
           </div>
