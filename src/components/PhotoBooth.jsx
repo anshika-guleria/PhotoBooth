@@ -46,7 +46,11 @@ useEffect(() => {
       if (!e.target.closest("[data-sticker]")) setSelectedUid(null);
     };
     window.addEventListener("mousedown", handleClick);
-    return () => window.removeEventListener("mousedown", handleClick);
+    window.addEventListener("touchstart", handleClick, { passive: true });
+    return () => {
+      window.removeEventListener("mousedown", handleClick);
+      window.removeEventListener("touchstart", handleClick);
+    };
   }, []);
 
   // ── Capture photo — bakes rotation into canvas ─────────────────────────────
@@ -188,50 +192,73 @@ useEffect(() => {
   const currentStickerKeys = STICKERS_PER_THEME[selectedTheme];
   const selectedSticker = placedStickers.find(s => s.uid === selectedUid);
 
+  /* Pixel / arcade font is illegible below ~14px on phones — use system UI there */
+  const uiFont =
+    isMobile && selectedTheme === "pixel"
+      ? "system-ui, -apple-system, 'Segoe UI', sans-serif"
+      : theme.font;
+
   const sz = isMobile ? {
-    titleFont:22, themeFont:12, themePad:"6px 12px", labelFont:12, chipFont:13,
-    chipPad:"6px 14px", snapFont:17, snapPad:"14px 28px", btnFont:13, btnPad:"11px 18px",
-    stripW:"100%", slotFont:20, redoFont:11, dlFont:15, dlPad:"13px 0",
-    panelPad:"14px", gap:12, mainPad:"14px 12px",
-    stickerCols:"repeat(auto-fill, minmax(48px, 1fr))", tipFont:11,
+    titleFont: 26, themeFont: 14, themePad: "10px 16px", labelFont: 14, chipFont: 14,
+    chipPad: "10px 16px", snapFont: 16, snapPad: "14px 22px", btnFont: 14, btnPad: "12px 18px",
+    stripW: "100%", slotFont: 22, redoFont: 13, dlFont: 16, dlPad: "14px 0",
+    panelPad: "16px", gap: 14, mainPad: "14px 12px max(18px, env(safe-area-inset-bottom))",
+    stickerCols: "repeat(auto-fill, minmax(52px, 1fr))", tipFont: 13,
+    stickerPanelFont: 13, controlFont: 13, controlBtnPad: "8px 12px",
   } : {
     titleFont:34, themeFont:14, themePad:"8px 18px", labelFont:13, chipFont:14,
     chipPad:"8px 16px", snapFont:19, snapPad:"17px 40px", btnFont:15, btnPad:"14px 24px",
     stripW:230, slotFont:24, redoFont:13, dlFont:16, dlPad:"15px 0",
     panelPad:"20px", gap:18, mainPad:"20px 20px",
     stickerCols:"repeat(auto-fill, minmax(58px, 1fr))", tipFont:12,
+    stickerPanelFont: 12, controlFont: 12, controlBtnPad: "4px 10px",
   };
 
   return (
     <div
       style={{
-        minHeight:"100vh", background:theme.backgroundGradient,
-        fontFamily:theme.font, display:"flex", flexDirection:"column",
+        minHeight:"100dvh", background:theme.backgroundGradient,
+        fontFamily:uiFont, display:"flex", flexDirection:"column",
         alignItems:"center", overflowX:"hidden",
+        paddingLeft:"env(safe-area-inset-left)", paddingRight:"env(safe-area-inset-right)",
       }}
       onMouseMove={handleDragMove} onMouseUp={handleDragEnd}
       onTouchMove={handleDragMove} onTouchEnd={handleDragEnd}
     >
 
       {/* HEADER */}
-      <div style={{ width:"100%", padding:isMobile?"16px 12px":"24px 32px", textAlign:"center", borderBottom:`1px solid ${theme.accent}30` }}>
-        <h1 style={{ fontSize:sz.titleFont, color:theme.textColor, fontWeight:"bold", textShadow:`0 0 30px ${theme.glow}`, margin:0, letterSpacing:2 }}>
+      <div style={{ width:"100%", padding:isMobile?"max(16px, env(safe-area-inset-top)) 12px 16px":"24px 32px", textAlign:"center", borderBottom:`1px solid ${theme.accent}30` }}>
+        <h1 style={{ fontSize:sz.titleFont, color:theme.textColor, fontWeight:"bold", textShadow:`0 0 30px ${theme.glow}`, margin:0, letterSpacing:isMobile?1:2, lineHeight:1.2 }}>
           ✦ Photo Booth ✦
         </h1>
       </div>
 
-      {/* THEME BAR */}
-      <div style={{ display:"flex", gap:8, flexWrap:"wrap", justifyContent:"center", padding:isMobile?"10px":"14px 24px", borderBottom:`1px solid ${theme.accent}20`, width:"100%", boxSizing:"border-box" }}>
+      {/* THEME BAR — scroll one row on narrow screens so it stays scannable */}
+      <div style={{
+        width:"100%", boxSizing:"border-box", borderBottom:`1px solid ${theme.accent}20`,
+        padding:isMobile?"10px 0":"14px 24px",
+        overflowX:isMobile?"auto":"visible",
+        WebkitOverflowScrolling:"touch",
+        scrollbarWidth:"thin",
+      }}>
+        <div style={{
+          display:"flex", gap:8, flexWrap:isMobile?"nowrap":"wrap",
+          justifyContent:isMobile?"flex-start":"center",
+          padding:isMobile?"0 12px":"0", width:isMobile?"max-content":"100%",
+          minWidth:0,
+        }}>
         {Object.entries(THEMES).map(([k,v]) => (
-          <button key={k} onClick={() => { setSelectedTheme(k);  setSelectedUid(null); }} style={{
-            padding:sz.themePad, borderRadius:999,
+          <button key={k} type="button" onClick={() => { setSelectedTheme(k);  setSelectedUid(null); }} style={{
+            padding:sz.themePad, borderRadius:999, flexShrink:0,
             border:`2px solid ${k===selectedTheme ? theme.accent : theme.accent+"30"}`,
             background:k===selectedTheme ? theme.accent+"25" : "transparent",
             color:k===selectedTheme ? theme.accent : theme.mutedColor,
             cursor:"pointer", fontSize:sz.themeFont, fontFamily:"inherit",
             fontWeight:k===selectedTheme?"bold":"normal", whiteSpace:"nowrap", transition:"all 0.15s",
+            touchAction:"manipulation",
           }}>{v.emoji} {v.name}</button>
         ))}
+        </div>
       </div>
 
       {/* MAIN LAYOUT */}
@@ -241,7 +268,11 @@ useEffect(() => {
         <div style={{ display:"flex", flexDirection:"column", gap:sz.gap, flex:isMobile?"none":"1 1 0", minWidth:0, width:isMobile?"100%":undefined, maxWidth:isMobile?"100%":640 }}>
 
           {/* Camera viewport */}
-          <div style={{ position:"relative", width:"100%", aspectRatio:"4/3", borderRadius:16, overflow:"hidden", border:`3px solid ${theme.accent}`, boxShadow:`0 0 44px ${theme.glow}55, 0 8px 32px rgba(0,0,0,0.45)`, background:"#000" }}>
+          <div style={{
+            position:"relative", width:"100%", aspectRatio:"4/3", borderRadius:16, overflow:"hidden",
+            border:`3px solid ${theme.accent}`, boxShadow:`0 0 44px ${theme.glow}55, 0 8px 32px rgba(0,0,0,0.45)`, background:"#000",
+            touchAction: draggingUid ? "none" : "manipulation",
+          }}>
             <video ref={videoRef} autoPlay muted playsInline style={{ position:"absolute", opacity:0, top:0, left:0, width:1, height:1 }} />
             {cameraError ? (
               <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", color:theme.mutedColor, gap:14 }}>
@@ -253,7 +284,7 @@ useEffect(() => {
             )}
 
             {/* Sticker layer */}
-            <div ref={stickerLayer} style={{ position:"absolute", inset:0 }}>
+            <div ref={stickerLayer} style={{ position:"absolute", inset:0, touchAction: draggingUid ? "none" : "manipulation" }}>
               {placedStickers.map(sticker => {
                 const img = getCachedImage(sticker.key);
                 const isSelected = sticker.uid === selectedUid;
@@ -303,34 +334,34 @@ useEffect(() => {
 
           {/* ── Sticker resize + rotate controls (shows when a sticker is selected) ── */}
           {selectedSticker && (
-            <div data-sticker="true" style={{
+              <div data-sticker="true" style={{
               display:"flex", flexDirection:"column", gap:8,
               background: theme.panelBackground,
               border:`1.5px solid ${theme.accent}50`,
               borderRadius:12, padding:"12px 14px",
             }}>
-              <div style={{ fontSize:11, fontWeight:"bold", color:theme.accent, textTransform:"uppercase", letterSpacing:"0.08em" }}>
+              <div style={{ fontSize:sz.stickerPanelFont, fontWeight:"bold", color:theme.accent, textTransform:"uppercase", letterSpacing:"0.06em" }}>
                 Selected sticker
               </div>
 
               {/* Size slider */}
               <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                <span style={{ fontSize:12, color:theme.mutedColor, width:44 }}>Size</span>
+                <span style={{ fontSize:sz.controlFont, color:theme.mutedColor, width:isMobile?48:44, flexShrink:0 }}>Size</span>
                 <input type="range" min={24} max={200} value={selectedSticker.size}
                   onChange={e => updateSticker(selectedUid, { size: Number(e.target.value) })}
                   style={{ flex:1, accentColor: theme.accent }}
                 />
-                <span style={{ fontSize:12, color:theme.mutedColor, width:32, textAlign:"right" }}>{selectedSticker.size}px</span>
+                <span style={{ fontSize:sz.controlFont, color:theme.mutedColor, width:36, textAlign:"right", flexShrink:0 }}>{selectedSticker.size}px</span>
               </div>
 
               {/* Rotation slider */}
               <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                <span style={{ fontSize:12, color:theme.mutedColor, width:44 }}>Rotate</span>
+                <span style={{ fontSize:sz.controlFont, color:theme.mutedColor, width:isMobile?48:44, flexShrink:0 }}>Rotate</span>
                 <input type="range" min={-180} max={180} value={selectedSticker.rotation||0}
                   onChange={e => updateSticker(selectedUid, { rotation: Number(e.target.value) })}
                   style={{ flex:1, accentColor: theme.accent }}
                 />
-                <span style={{ fontSize:12, color:theme.mutedColor, width:32, textAlign:"right" }}>{selectedSticker.rotation||0}°</span>
+                <span style={{ fontSize:sz.controlFont, color:theme.mutedColor, width:36, textAlign:"right", flexShrink:0 }}>{selectedSticker.rotation||0}°</span>
               </div>
 
               {/* Quick rotate buttons + delete */}
@@ -342,48 +373,48 @@ useEffect(() => {
                   { label:"↻ +45°", delta:+45 },
                   { label:"Reset",  reset:true },
                 ].map(btn => (
-                  <button key={btn.label}
+                  <button key={btn.label} type="button"
                     onClick={() => {
                       if (btn.reset) updateSticker(selectedUid, { rotation:0, size:64, flipX:false, flipY:false });
                       else updateSticker(selectedUid, { rotation: ((selectedSticker.rotation||0) + btn.delta + 360) % 360 });
                     }}
                     style={{
-                      padding:"4px 10px", borderRadius:999, fontSize:11,
+                      padding:sz.controlBtnPad, borderRadius:999, fontSize:sz.controlFont,
                       border:`1.5px solid ${theme.accent}50`,
                       background:"transparent", color:theme.accent,
-                      cursor:"pointer", fontFamily:"inherit",
+                      cursor:"pointer", fontFamily:"inherit", touchAction:"manipulation",
                     }}
                   >{btn.label}</button>
                 ))}
-                <button
+                <button type="button"
                   onClick={() => { setPlacedStickers(prev => prev.filter(s => s.uid !== selectedUid)); setSelectedUid(null); }}
                   style={{
-                    padding:"4px 10px", borderRadius:999, fontSize:11,
+                    padding:sz.controlBtnPad, borderRadius:999, fontSize:sz.controlFont,
                     border:"1.5px solid #ef4444",
                     background:"transparent", color:"#ef4444",
-                    cursor:"pointer", fontFamily:"inherit", marginLeft:"auto",
+                    cursor:"pointer", fontFamily:"inherit", marginLeft:"auto", touchAction:"manipulation",
                   }}
                 >🗑 Remove</button>
               </div>
 
               {/* Flip buttons */}
-              <div style={{ display:"flex", gap:6 }}>
-                <button
+              <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+                <button type="button"
                   onClick={() => updateSticker(selectedUid, { flipX: !selectedSticker.flipX })}
                   style={{
-                    padding:"4px 12px", borderRadius:999, fontSize:11,
+                    padding:sz.controlBtnPad, borderRadius:999, fontSize:sz.controlFont,
                     border:`1.5px solid ${selectedSticker.flipX ? theme.accent : theme.accent+"50"}`,
                     background: selectedSticker.flipX ? theme.accent+"25" : "transparent",
-                    color: theme.accent, cursor:"pointer", fontFamily:"inherit",
+                    color: theme.accent, cursor:"pointer", fontFamily:"inherit", touchAction:"manipulation",
                   }}
                 >⇔ Flip Horizontal</button>
-                <button
+                <button type="button"
                   onClick={() => updateSticker(selectedUid, { flipY: !selectedSticker.flipY })}
                   style={{
-                    padding:"4px 12px", borderRadius:999, fontSize:11,
+                    padding:sz.controlBtnPad, borderRadius:999, fontSize:sz.controlFont,
                     border:`1.5px solid ${selectedSticker.flipY ? theme.accent : theme.accent+"50"}`,
                     background: selectedSticker.flipY ? theme.accent+"25" : "transparent",
-                    color: theme.accent, cursor:"pointer", fontFamily:"inherit",
+                    color: theme.accent, cursor:"pointer", fontFamily:"inherit", touchAction:"manipulation",
                   }}
                 >⇕ Flip Vertical</button>
               </div>
@@ -393,38 +424,43 @@ useEffect(() => {
           {/* Filters */}
           <div>
             <div style={{ fontSize:sz.labelFont, fontWeight:"bold", color:theme.accent, letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:8 }}>Filters</div>
-            <div style={{ display:"flex", gap:7, flexWrap:"wrap" }}>
+            <div style={{
+              display:"flex", gap:7, flexWrap:isMobile?"nowrap":"wrap",
+              overflowX:isMobile?"auto":"visible", WebkitOverflowScrolling:"touch", paddingBottom:isMobile?4:0,
+              scrollbarWidth:"thin",
+            }}>
               {CAMERA_FILTERS.map(f => (
-                <button key={f.id} onClick={() => setSelectedFilter(f.id)} style={{
-                  padding:sz.chipPad, borderRadius:999,
+                <button key={f.id} type="button" onClick={() => setSelectedFilter(f.id)} style={{
+                  padding:sz.chipPad, borderRadius:999, flexShrink:0,
                   border:`2px solid ${f.id===selectedFilter ? theme.accent : theme.accent+"35"}`,
                   background:f.id===selectedFilter ? theme.accent+"25" : "transparent",
                   color:f.id===selectedFilter ? theme.accent : theme.mutedColor,
                   fontSize:sz.chipFont, cursor:"pointer", fontFamily:"inherit", transition:"all 0.15s",
+                  touchAction:"manipulation",
                 }}>{f.name}</button>
               ))}
             </div>
           </div>
 
           {/* Border picker */}
-          <BorderPreview selectedBorder={selectedBorder} onSelect={setSelectedBorder} theme={theme} />
+          <BorderPreview selectedBorder={selectedBorder} onSelect={setSelectedBorder} theme={theme} isMobile={isMobile} />
 
           {/* Action buttons */}
-          <div style={{ display:"flex", gap:10, flexWrap:"wrap", alignItems:"center" }}>
-            <button onClick={handleSnap} disabled={!canSnap} style={{
+          <div style={{ display:"flex", gap:10, flexWrap:"wrap", alignItems:"stretch" }}>
+            <button type="button" onClick={handleSnap} disabled={!canSnap} style={{
               padding:sz.snapPad, borderRadius:999, border:"none",
               background:canSnap ? theme.accent : theme.mutedColor,
               color:"#000", fontWeight:"bold", fontSize:sz.snapFont,
               cursor:canSnap?"pointer":"default", fontFamily:"inherit",
               boxShadow:canSnap?`0 0 26px ${theme.glow}bb`:"none",
-              opacity:canSnap?1:0.45, flex:isMobile?"1":undefined, transition:"all 0.2s",
+              opacity:canSnap?1:0.45, flex:isMobile?"1 1 100%":undefined, minHeight:48, transition:"all 0.2s", touchAction:"manipulation",
             }}>
               {countdown!==null ? `⏱ ${countdown}` : activeSlot>=3 ? "Strip Full!" : `📸 Snap  (${3-activeSlot} left)`}
             </button>
-            <button onClick={() => { setPlacedStickers([]); setSelectedUid(null); }} style={{ padding:sz.btnPad, borderRadius:999, border:`2px solid ${theme.accent}`, background:"transparent", color:theme.accent, fontSize:sz.btnFont, cursor:"pointer", fontFamily:"inherit" }}>
+            <button type="button" onClick={() => { setPlacedStickers([]); setSelectedUid(null); }} style={{ padding:sz.btnPad, borderRadius:999, border:`2px solid ${theme.accent}`, background:"transparent", color:theme.accent, fontSize:sz.btnFont, cursor:"pointer", fontFamily:"inherit", flex:isMobile?"1 1 calc(50% - 5px)":undefined, minHeight:48, touchAction:"manipulation" }}>
               Clear Stickers
             </button>
-            <button onClick={() => { setPhotoStrip([null,null,null]); setActiveSlot(0); }} style={{ padding:sz.btnPad, borderRadius:999, border:`2px solid ${theme.accent}`, background:"transparent", color:theme.accent, fontSize:sz.btnFont, cursor:"pointer", fontFamily:"inherit" }}>
+            <button type="button" onClick={() => { setPhotoStrip([null,null,null]); setActiveSlot(0); }} style={{ padding:sz.btnPad, borderRadius:999, border:`2px solid ${theme.accent}`, background:"transparent", color:theme.accent, fontSize:sz.btnFont, cursor:"pointer", fontFamily:"inherit", flex:isMobile?"1 1 calc(50% - 5px)":undefined, minHeight:48, touchAction:"manipulation" }}>
               Reset
             </button>
           </div>
@@ -433,11 +469,12 @@ useEffect(() => {
         {/* MIDDLE: Strip */}
         <div style={{ display:"flex", flexDirection:"column", gap:10, background:theme.panelBackground, borderRadius:18, border:`2px solid ${theme.accent}`, padding:sz.panelPad, flex:"0 0 auto", width:isMobile?"100%":sz.stripW, alignItems:"center", boxSizing:"border-box", boxShadow:`0 0 32px ${theme.glow}28` }}>
           <div style={{ fontSize:sz.labelFont+2, fontWeight:"bold", color:theme.accent, letterSpacing:"0.1em", textTransform:"uppercase", textAlign:"center" }}>{theme.emoji} Strip</div>
-          <div style={{ display:"flex", flexDirection:isMobile?"row":"column", gap:8, width:"100%" }}>
+          {/* Column on mobile too — three slots in a row were too narrow on phones */}
+          <div style={{ display:"flex", flexDirection:"column", gap:8, width:"100%" }}>
             {[0,1,2].map(i => {
               const filled=!!photoStrip[i], active=i===activeSlot&&!filled;
               return (
-                <div key={i} style={{ position:"relative", flex:isMobile?"1":undefined, width:isMobile?undefined:"100%", aspectRatio:"4/3", borderRadius:10, border:`2px ${filled?"solid":"dashed"} ${active?theme.accent:filled?theme.accent+"80":theme.accent+"30"}`, background:filled?"#000":theme.accentDim+"22", overflow:"hidden", boxShadow:active?`0 0 18px ${theme.glow}70`:"none" }}>
+                <div key={i} style={{ position:"relative", width:"100%", aspectRatio:"4/3", borderRadius:10, border:`2px ${filled?"solid":"dashed"} ${active?theme.accent:filled?theme.accent+"80":theme.accent+"30"}`, background:filled?"#000":theme.accentDim+"22", overflow:"hidden", boxShadow:active?`0 0 18px ${theme.glow}70`:"none" }}>
                   {filled ? (
                     <>
                       <img src={photoStrip[i]} alt={`Photo ${i+1}`} style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }} />
@@ -450,7 +487,7 @@ useEffect(() => {
               );
             })}
           </div>
-          <button onClick={handleDownload} disabled={filledPhotoCount===0} style={{ width:"100%", padding:sz.dlPad, borderRadius:999, border:"none", background:theme.accent, color:"#000", fontWeight:"bold", fontSize:sz.dlFont, cursor:filledPhotoCount===0?"default":"pointer", fontFamily:"inherit", boxShadow:`0 0 20px ${theme.glow}66`, opacity:filledPhotoCount===0?0.4:1 }}>
+          <button type="button" onClick={handleDownload} disabled={filledPhotoCount===0} style={{ width:"100%", padding:sz.dlPad, borderRadius:999, border:"none", background:theme.accent, color:"#000", fontWeight:"bold", fontSize:sz.dlFont, cursor:filledPhotoCount===0?"default":"pointer", fontFamily:"inherit", boxShadow:`0 0 20px ${theme.glow}66`, opacity:filledPhotoCount===0?0.4:1, minHeight:48, touchAction:"manipulation" }}>
             ⬇ Download Strip
           </button>
           <div style={{ fontSize:sz.labelFont, color:theme.mutedColor, textAlign:"center" }}>{filledPhotoCount} / 3 photos</div>
@@ -463,8 +500,8 @@ useEffect(() => {
             {currentStickerKeys.map(key => {
               const img = getCachedImage(key);
               return (
-                <button key={key} onClick={() => handleAddSticker(key)} title={`Add ${key}`}
-                  style={{ minWidth:0, width:"100%", aspectRatio:"1", borderRadius:10, border:`2px solid ${theme.accent}30`, background:theme.accentDim+"28", cursor:"pointer", padding:5, display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", transition:"transform 0.12s, border-color 0.12s", boxSizing:"border-box", fontSize:22 }}
+                <button key={key} type="button" onClick={() => handleAddSticker(key)} title={`Add ${key}`}
+                  style={{ minWidth:0, width:"100%", aspectRatio:"1", borderRadius:10, border:`2px solid ${theme.accent}30`, background:theme.accentDim+"28", cursor:"pointer", padding:5, display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", transition:"transform 0.12s, border-color 0.12s", boxSizing:"border-box", fontSize:22, touchAction:"manipulation" }}
                   onMouseEnter={e => { e.currentTarget.style.transform="scale(1.1)"; e.currentTarget.style.borderColor=theme.accent; }}
                   onMouseLeave={e => { e.currentTarget.style.transform="scale(1)";   e.currentTarget.style.borderColor=theme.accent+"30"; }}
                 >
@@ -484,7 +521,7 @@ useEffect(() => {
       </div>
 
       {/* CREDITS */}
-      <div style={{ width:"100%", padding:"14px 20px", borderTop:`1px solid ${theme.accent}15`, textAlign:"center", fontSize:12, color:theme.mutedColor, marginTop:"auto", boxSizing:"border-box" }}>
+      <div style={{ width:"100%", padding:isMobile?"14px 16px max(14px, env(safe-area-inset-bottom))":"14px 20px", borderTop:`1px solid ${theme.accent}15`, textAlign:"center", fontSize:isMobile?14:12, color:theme.mutedColor, marginTop:"auto", boxSizing:"border-box", lineHeight:1.5 }}>
         Stickers by{" "}
         <a href="https://www.flaticon.com" target="_blank" rel="noreferrer" style={{ color:theme.accent, textDecoration:"none", fontWeight:"bold" }}>Flaticon</a>
         {" · "}

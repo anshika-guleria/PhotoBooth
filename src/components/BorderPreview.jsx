@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { BORDER_T, PHOTO_BORDERS } from '../constants/borders';
 import { drawArtBorder } from '../utils/glitter';
 
-export default function BorderPreview({ selectedBorder, onSelect, theme }) {
+export default function BorderPreview({ selectedBorder, onSelect, theme, isMobile = false }) {
   const canvasRefs = useRef({});
   const T = BORDER_T;
 
@@ -29,17 +29,21 @@ export default function BorderPreview({ selectedBorder, onSelect, theme }) {
     });
   }, []);
 
+  const labelSize = isMobile ? 12 : 10;
+  const sectionLabel = isMobile ? 14 : 12;
+  const gridMin = isMobile ? 100 : 90;
+
   return (
     <div>
       <div style={{
-        fontSize: 12, fontWeight: "bold", color: theme.accent,
-        letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10,
+        fontSize: sectionLabel, fontWeight: "bold", color: theme.accent,
+        letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10,
       }}>
         Border Preview
       </div>
       <div style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(90px, 1fr))",
+        gridTemplateColumns: `repeat(auto-fill, minmax(${gridMin}px, 1fr))`,
         gap: 8,
       }}>
         {/* None option */}
@@ -60,7 +64,7 @@ export default function BorderPreview({ selectedBorder, onSelect, theme }) {
             display: "flex", alignItems: "center", justifyContent: "center",
             color: theme.mutedColor, fontSize: 18,
           }}>○</div>
-          <span style={{ fontSize: 10, color: theme.mutedColor }}>None</span>
+          <span style={{ fontSize: labelSize, color: theme.mutedColor }}>None</span>
         </div>
 
         {PHOTO_BORDERS.filter(b => b.id !== "none").map(b => (
@@ -83,7 +87,7 @@ export default function BorderPreview({ selectedBorder, onSelect, theme }) {
               width={72} height={54}
               style={{ borderRadius: 5, display: "block" }}
             />
-            <span style={{ fontSize: 10, color: b.id === selectedBorder ? theme.accent : theme.mutedColor }}>
+            <span style={{ fontSize: labelSize, color: b.id === selectedBorder ? theme.accent : theme.mutedColor }}>
               {b.preview} {b.name}
             </span>
           </div>
