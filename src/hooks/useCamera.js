@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { CAMERA_FILTERS } from '../constants/filters';
+import { drawMirroredVideoCover } from '../utils/drawMirroredVideoCover';
 import { applyFilterToPixels } from '../utils/filterUtils';
 import { drawArtBorder } from '../utils/glitter';
 
@@ -13,7 +14,13 @@ export default function useCamera(selectedFilter, selectedBorder) {
   // Start the camera
   useEffect(() => {
     navigator.mediaDevices
-      .getUserMedia({ video: { width: 480, height: 360, facingMode: "user" } })
+      .getUserMedia({
+        video: {
+          facingMode: "user",
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+      })
       .then(stream => {
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
@@ -38,8 +45,7 @@ export default function useCamera(selectedFilter, selectedBorder) {
     const ctx = canvas.getContext("2d");
 
     const renderFrame = () => {
-      ctx.save(); ctx.translate(480, 0); ctx.scale(-1, 1);
-      ctx.drawImage(video, 0, 0, 480, 360); ctx.restore();
+      drawMirroredVideoCover(ctx, video, 480, 360);
       if (selectedFilter !== "none") {
         const filterFn = CAMERA_FILTERS.find(f => f.id === selectedFilter)?.fn;
         const imageData = ctx.getImageData(0, 0, 480, 360);

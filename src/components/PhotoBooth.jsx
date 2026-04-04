@@ -3,6 +3,7 @@ import { CAMERA_FILTERS } from '../constants/filters';
 import { STICKERS_PER_THEME } from '../constants/stickers';
 import { THEMES } from '../constants/themes';
 import useCamera from '../hooks/useCamera';
+import { drawMirroredVideoCover } from '../utils/drawMirroredVideoCover';
 import { applyFilterToPixels } from '../utils/filterUtils';
 import { drawArtBorder } from '../utils/glitter';
 import { getCachedImage, preloadAllStickers } from '../utils/stickerCache';
@@ -58,8 +59,7 @@ useEffect(() => {
     const photoCanvas = document.createElement("canvas");
     photoCanvas.width = 480; photoCanvas.height = 360;
     const ctx = photoCanvas.getContext("2d");
-    ctx.save(); ctx.translate(480, 0); ctx.scale(-1, 1);
-    ctx.drawImage(videoRef.current, 0, 0, 480, 360); ctx.restore();
+    drawMirroredVideoCover(ctx, videoRef.current, 480, 360);
     if (selectedFilter !== "none") {
       const filterFn = CAMERA_FILTERS.find(f => f.id === selectedFilter)?.fn;
       const imageData = ctx.getImageData(0, 0, 480, 360);
