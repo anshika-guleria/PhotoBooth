@@ -1,30 +1,26 @@
 /**
- * Draw front-camera video into a cw×ch frame without stretching: crops like CSS object-fit: cover,
- * then mirrors horizontally for a natural selfie preview.
+ * Draw mirrored selfie preview into cw×ch without stretching.
+ * `coverBias` 1 = full cover (fills frame, crops edges). 0 = full contain (letterbox).
+ * Default pulls back slightly from full cover so more of the scene is visible on phones.
  */
-export function drawMirroredVideoCover(ctx, video, cw, ch) {
+export function drawMirroredVideoCover(ctx, video, cw, ch, coverBias = 0.58) {
   const vw = video.videoWidth;
   const vh = video.videoHeight;
   if (!vw || !vh) return;
 
-  const canvasRatio = cw / ch;
-  const videoRatio = vw / vh;
-  let sx, sy, sw, sh;
-  if (videoRatio > canvasRatio) {
-    sh = vh;
-    sw = vh * canvasRatio;
-    sx = (vw - sw) / 2;
-    sy = 0;
-  } else {
-    sw = vw;
-    sh = vw / canvasRatio;
-    sx = 0;
-    sy = (vh - sh) / 2;
-  }
+  const scaleCover = Math.max(cw / vw, ch / vh);
+  const scaleContain = Math.min(cw / vw, ch / vh);
+  const scale = scaleContain + (scaleCover - scaleContain) * coverBias;
+
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, cw, ch);
+
+  const dw = vw * scale;
+  const dh = vh * scale;
 
   ctx.save();
-  ctx.translate(cw, 0);
+  ctx.translate(cw / 2, ch / 2);
   ctx.scale(-1, 1);
-  ctx.drawImage(video, sx, sy, sw, sh, 0, 0, cw, ch);
+  ctx.drawImage(video, 0, 0, vw, vh, -dw / 2, -dh / 2, dw, dh);
   ctx.restore();
 }

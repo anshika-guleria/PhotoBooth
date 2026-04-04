@@ -45,7 +45,7 @@ export default function useCamera(selectedFilter, selectedBorder) {
     const ctx = canvas.getContext("2d");
 
     const renderFrame = () => {
-      drawMirroredVideoCover(ctx, video, 480, 360);
+      drawMirroredVideoCover(ctx, video, 480, 360, 0.58);
       if (selectedFilter !== "none") {
         const filterFn = CAMERA_FILTERS.find(f => f.id === selectedFilter)?.fn;
         const imageData = ctx.getImageData(0, 0, 480, 360);

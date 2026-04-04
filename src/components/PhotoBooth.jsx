@@ -23,6 +23,8 @@ export default function PhotoBooth() {
   const [dragOffset,     setDragOffset]     = useState({ x: 0, y: 0 });
   const [selectedUid,    setSelectedUid]    = useState(null); // which sticker is selected
   const [isMobile,       setIsMobile]       = useState(false);
+  /** photo | look | stickers — mobile only */
+  const [mobileTab,      setMobileTab]      = useState("photo");
 
   const stickerLayer  = useRef(null);
   const countdownRef  = useRef(null);
@@ -59,7 +61,7 @@ useEffect(() => {
     const photoCanvas = document.createElement("canvas");
     photoCanvas.width = 480; photoCanvas.height = 360;
     const ctx = photoCanvas.getContext("2d");
-    drawMirroredVideoCover(ctx, videoRef.current, 480, 360);
+    drawMirroredVideoCover(ctx, videoRef.current, 480, 360, 0.58);
     if (selectedFilter !== "none") {
       const filterFn = CAMERA_FILTERS.find(f => f.id === selectedFilter)?.fn;
       const imageData = ctx.getImageData(0, 0, 480, 360);
@@ -156,6 +158,7 @@ useEffect(() => {
       flipY: false,
     }]);
     setSelectedUid(uid);
+    if (isMobile) setMobileTab("photo");
   };
 
   const updateSticker = (uid, changes) => {
@@ -261,12 +264,36 @@ useEffect(() => {
         </div>
       </div>
 
-      {/* MAIN LAYOUT */}
-      <div style={{ display:"flex", flexDirection:isMobile?"column":"row", gap:sz.gap, padding:sz.mainPad, width:"100%", maxWidth:1280, alignItems:"flex-start", justifyContent:"center", boxSizing:"border-box" }}>
+      {/* MAIN LAYOUT — mobile: tabs reduce scrolling between camera, look, stickers */}
+      <div style={{ display:"flex", flexDirection:isMobile?"column":"row", gap:sz.gap, padding:sz.mainPad, width:"100%", maxWidth:1280, alignItems:isMobile?"stretch":"flex-start", justifyContent:"center", boxSizing:"border-box" }}>
+        {isMobile && (
+          <div role="tablist" aria-label="Photo booth sections" style={{ display:"flex", gap:8, width:"100%", flexShrink:0 }}>
+            {[
+              { id: "photo", label: "📸 Snap" },
+              { id: "look", label: "✨ Look" },
+              { id: "stickers", label: "🎨 Stickers" },
+            ].map(tab => (
+              <button key={tab.id} type="button" role="tab" aria-selected={mobileTab === tab.id}
+                onClick={() => setMobileTab(tab.id)}
+                style={{
+                  flex: 1, padding: "11px 8px", borderRadius: 14,
+                  border: `2px solid ${mobileTab === tab.id ? theme.accent : theme.accent + "35"}`,
+                  background: mobileTab === tab.id ? theme.accent + "22" : "transparent",
+                  color: mobileTab === tab.id ? theme.accent : theme.mutedColor,
+                  fontWeight: mobileTab === tab.id ? "bold" : "600",
+                  fontSize: 13, fontFamily: "inherit", touchAction: "manipulation",
+                  minHeight: 44,
+                }}
+              >{tab.label}</button>
+            ))}
+          </div>
+        )}
 
-        {/* LEFT: Camera + controls */}
+        {/* LEFT: Camera + controls (on phone: Snap + Look share this column by tab) */}
         <div style={{ display:"flex", flexDirection:"column", gap:sz.gap, flex:isMobile?"none":"1 1 0", minWidth:0, width:isMobile?"100%":undefined, maxWidth:isMobile?"100%":640 }}>
 
+          {(!isMobile || mobileTab === "photo") && (
+          <>
           {/* Camera viewport */}
           <div style={{
             position:"relative", width:"100%", aspectRatio:"4/3", borderRadius:16, overflow:"hidden",
@@ -421,6 +448,11 @@ useEffect(() => {
             </div>
           )}
 
+          </>
+          )}
+
+          {(!isMobile || mobileTab === "look") && (
+          <>
           {/* Filters */}
           <div>
             <div style={{ fontSize:sz.labelFont, fontWeight:"bold", color:theme.accent, letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:8 }}>Filters</div>
@@ -445,7 +477,10 @@ useEffect(() => {
           {/* Border picker */}
           <BorderPreview selectedBorder={selectedBorder} onSelect={setSelectedBorder} theme={theme} isMobile={isMobile} />
 
-          {/* Action buttons */}
+          </>
+          )}
+
+          {(!isMobile || mobileTab === "photo") && (
           <div style={{ display:"flex", gap:10, flexWrap:"wrap", alignItems:"stretch" }}>
             <button type="button" onClick={handleSnap} disabled={!canSnap} style={{
               padding:sz.snapPad, borderRadius:999, border:"none",
@@ -464,9 +499,11 @@ useEffect(() => {
               Reset
             </button>
           </div>
+          )}
         </div>
 
         {/* MIDDLE: Strip */}
+        {(!isMobile || mobileTab === "photo") && (
         <div style={{ display:"flex", flexDirection:"column", gap:10, background:theme.panelBackground, borderRadius:18, border:`2px solid ${theme.accent}`, padding:sz.panelPad, flex:"0 0 auto", width:isMobile?"100%":sz.stripW, alignItems:"center", boxSizing:"border-box", boxShadow:`0 0 32px ${theme.glow}28` }}>
           <div style={{ fontSize:sz.labelFont+2, fontWeight:"bold", color:theme.accent, letterSpacing:"0.1em", textTransform:"uppercase", textAlign:"center" }}>{theme.emoji} Strip</div>
           {/* Column on mobile too — three slots in a row were too narrow on phones */}
@@ -492,8 +529,10 @@ useEffect(() => {
           </button>
           <div style={{ fontSize:sz.labelFont, color:theme.mutedColor, textAlign:"center" }}>{filledPhotoCount} / 3 photos</div>
         </div>
+        )}
 
         {/* RIGHT: Stickers */}
+        {(!isMobile || mobileTab === "stickers") && (
         <div style={{ display:"flex", flexDirection:"column", gap:10, background:theme.panelBackground, borderRadius:18, border:`2px solid ${theme.accent}30`, padding:sz.panelPad, flex:"0 0 auto", width:isMobile?"100%":270, boxSizing:"border-box", overflow:"hidden", minWidth:0 }}>
           <div style={{ fontSize:sz.labelFont+2, fontWeight:"bold", color:theme.accent, letterSpacing:"0.1em", textTransform:"uppercase" }}>Stickers</div>
           <div style={{ display:"grid", gridTemplateColumns:sz.stickerCols, gap:6, width:"100%", minWidth:0 }}>
@@ -517,6 +556,7 @@ useEffect(() => {
             Tap to place · Drag to move · Double-tap removes · Tap sticker to resize/rotate
           </div>
         </div>
+        )}
 
       </div>
 
