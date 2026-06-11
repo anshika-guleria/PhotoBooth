@@ -197,10 +197,8 @@ mySticker: "🌈"
 
 ## 🛠 Tech Stack
 
-- React 18  
-- Canvas API  
-- No external dependencies  
-
+- React 18
+- 
 ---
 
 ## 📄 License
