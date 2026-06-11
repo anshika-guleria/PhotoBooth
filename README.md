@@ -205,4 +205,8 @@ mySticker: "🌈"
 
 ## 📄 License
 
-MIT
+Copyright © 2026 Anshika Guleria
+
+This project is proprietary and all rights are reserved.
+
+You may not copy, modify, distribute, sublicense, or use any part of this codebase without explicit written permission from the author.
