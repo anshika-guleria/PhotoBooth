@@ -198,7 +198,7 @@ mySticker: "🌈"
 ## 🛠 Tech Stack
 
 - React 18
-- 
+
 ---
 
 ## 📄 License
